@@ -7,6 +7,7 @@
 #   File > Import > Upload
 #   Replace Current Sheet
 #   Separator: Detect Automatically
+# See the setup steps in the top level README.
 import fileinput
 import re
 import sys
