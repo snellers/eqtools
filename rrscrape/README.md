@@ -82,8 +82,8 @@ rrscrape.bat
 
 ### Testing
 
-To try the script out on a small number of characters roster, answer 'N' to the question
-it asks about performing a full scrape. This will summarize only a few characters.
+To try the script out on a small number of characters, answer 'N' to the question
+asked about performing a full scrape. This will summarize only a few characters.
 
 ## Disclaimer
 
