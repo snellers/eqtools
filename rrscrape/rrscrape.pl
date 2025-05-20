@@ -18,8 +18,7 @@ print "Enter forum login. Your credentials will not be stored on your device.\n"
 my $login = prompt("Login (email address): ");
 my $password = prompt("Password: ");
 if($login eq "" or $password eq "") {
-    print "Invalid credentials, please try again.\n";
-    exit;
+    die("Invalid credentials, please try again.");
 }
 my ($scrape_mode, $num_test_chars) = get_scrape_mode();
 my @alternates = load_alternates("alternates.txt");
@@ -66,12 +65,10 @@ sub load_config {
     close($config_file);
     chomp($guild_name);
     if ($guild_name eq "") {
-        print(config_txt_advice());
-        exit;
+        die(config_txt_advice());
     }
     if ($guild_name =~ /http/) {
-        print("Edit config.txt and remove the http URL scheme from your guild name.\n");
-        exit;
+        die("Edit config.txt and remove the http URL scheme from your guild name.");
     }
     return $guild_name;
 }
@@ -143,7 +140,7 @@ sub new_browser {
     my $browser = LWP::UserAgent->new(
         cookie_jar => {},
         allowed_protocols => ['https'],
-        timeout => 10
+        timeout => 60
     );
     # uncomment this to debug http requests
     #debug_ua($browser, 7);
@@ -165,14 +162,12 @@ sub try_login {
     );
     my $login_response = $browser->post($login_url, \%login_form);
     if ($login_response->is_error) {
-        print("Error communicating with the server, couldn't log in: " . $login_response->code . "\n");
-        exit;
+        die("Error communicating with the server, couldn't log in: " . $login_response->code . "\n");
     }
     # gl[session_id] contains the session cookie.
     my $cookie_gl_session_id = $browser->cookie_jar->get_cookies($base_url, "gl[session_id]");
     if ($cookie_gl_session_id =~ /^$/) {
-        print("Login failed, please try again.\n");
-        exit;
+        die("Login failed, please try again.\n");
     }
     return $browser;
 }
@@ -185,13 +180,15 @@ sub try_retrieve_members {
     my $members_url = "$base_url/rapid_raid/members.php";
     my $members_response = $browser->get($members_url);
     if ($members_response->is_error) {
-        print("Failed to download members list, error code: " . $members_response->code . "\n");
-        exit;
+        die("Failed to download members list, error code: " . $members_response->code);
     }
     # The members list is written to a temp file and read back in again. Mainly to aid debugging.
     open my $member_fh, ">", $filename or die("Can't open member list members.html for writing.");
     print $member_fh $members_response->decoded_content;
     close($member_fh);
+    if (!$members_response->decoded_content =~ /Members for the/) {
+        die("Didn't find expected content in the members page.");
+    }
     open $member_fh, "<", $filename or die("Can't open member list members.html.");
     return $member_fh;
 }
@@ -244,6 +241,9 @@ sub build_char_map {
     close($members_file);
     my $membercount = keys %$chars;
     print("Loaded $membercount guild members.\n");
+    if ($membercount == 0) {
+        die("At least one guild member should've been found. Something went wrong, try again later.");
+    }
     return $chars;
 }
 
@@ -255,10 +255,8 @@ sub try_retrieve_char_dkp {
     my $dkp_url = "$base_url/users/characters/character_dkp.php?char=$charid";
     my $dkp_response = $browser->get($dkp_url);
     if ($dkp_response->is_error) {
-        print("Failed to download DKP for character $charid error code: " . $dkp_response->code);
-        exit;
+        die("Failed to download DKP for character $charid error code: " . $dkp_response->code);
     }
-
     # Place every line containing an anchor tag on a new line as the html parser goes line by line.
     (my $dkp_unsplit = $dkp_response->decoded_content ) =~ s/(<a)/\n$1/g;
     open (my $dkp_file, ">", "dkp.html") or die("Can't dkp.html for writing.");
