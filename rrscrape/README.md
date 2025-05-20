@@ -48,9 +48,10 @@ Install some required perl modules by running this in a terminal (this may
 take a few minutes to complete):
 
 ```bash
-cpan List::MoreUtils HTTP::Cookies HTTP::Request LWP 
+cpan List::MoreUtils HTTP::Cookies HTTP::Request LWP LWP::Protocol::https Net::SSLea
 ```
-`cpan` itself is normally included when `perl` is installed.
+`cpan` itself is normally included when `perl` is installed. Some distributions of perl
+come with bundled with these modules.
 
 ### Configure Guild Name
 
