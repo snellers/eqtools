@@ -61,9 +61,9 @@ sub config_txt_advice {
 # load the guild web domain
 sub load_config {
     my $filename = shift;
-    open config_file, '<', $filename or die(config_txt_advice());
-    my $guild_name = <config_file>;
-    close(config_file);
+    open my $config_file, '<', $filename or die(config_txt_advice());
+    my $guild_name = <$config_file>;
+    close($config_file);
     chomp($guild_name);
     if ($guild_name eq "") {
         print(config_txt_advice());
