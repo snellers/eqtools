@@ -161,7 +161,7 @@ sub try_login {
         loginEmail => $login,
         loginPassword => $password,
         autoLogin => 'on',
-        'new' => 'Login'
+        new => 'Login'
     );
     my $login_response = $browser->post($login_url, \%login_form);
     if ($login_response->is_error) {
@@ -227,10 +227,10 @@ sub build_char_map {
             next if ($dkp == "0.00" or $attend_sixty == "0");
 
             $chars->{$charid} = {
-                'id' => $charid,
-                'name' => $charname,
-                'dkp' => $dkp, 
-                'attend_sixty' => $attend_sixty
+                id => $charid,
+                name => $charname,
+                dkp => $dkp,
+                attend_sixty => $attend_sixty
             };
         }
         # exit early if testing with only a few characters
