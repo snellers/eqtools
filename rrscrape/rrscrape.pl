@@ -256,9 +256,9 @@ sub try_retrieve_char_dkp {
         die("Failed to download DKP for character $charid error code: " . $dkp_response->code);
     }
     # Place every line containing an anchor tag on a new line as the html parser goes line by line.
-    (my $dkp_unsplit = $dkp_response->decoded_content ) =~ s/(<a)/\n$1/g;
+    (my $split_html = $dkp_response->decoded_content ) =~ s/(<[aA])/\n$1/g;
     open (my $dkp_file, ">", "dkp.html") or die("Can't dkp.html for writing.");
-    print $dkp_file $dkp_unsplit;
+    print $dkp_file $split_html;
     close($dkp_file);
     open $dkp_file, "dkp.html" or die("Can't open dkp.html.");
     return $dkp_file;
