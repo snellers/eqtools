@@ -11,36 +11,42 @@ use LWP;
 
 unlink("members.html", "dkp.html", "summary.csv");
 
-my $guild_name = load_config("config.txt");
-my $base_url = "https://$guild_name.guildlaunch.com";
-print ("The script will log into $base_url\n");
+# $conf: global hash of config settings loaded from disk.
+# $sess: global hash of Session Information.
+# These are never passed directly to subroutines.
+# All subroutines must only use the
+# parameters they're passed, and never variables that
+# are visible from their inherited scope.
+my $conf = ();
+my $sess = ();
+$conf->{ guild_name } = load_config("config.txt");
+$sess->{ base_url }= "https://$conf->{ guild_name }.guildlaunch.com";
+
+print ("The script will log into $sess->{ base_url }\n");
 print "Enter forum login. Your credentials will not be stored on your device.\n";
-my $login = prompt("Login (email address): ");
-my $password = prompt("Password: ");
-if($login eq "" or $password eq "") {
+
+$sess->{ login }= prompt("Login (email address): ");
+$sess->{ password } = prompt("Password: ");
+
+if($sess->{ login } eq "" or $sess->{ password } eq "") {
     die("Invalid credentials, please try again.");
 }
-my ($scrape_mode, $num_test_chars) = get_scrape_mode();
-my @alternates = load_alternates("alternates.txt");
-my @spell_tokens = load_spell_tokens("spell_tokens.txt");
-my @skipped_loot = load_skipped_loot("skipped_loot.txt");
-my $browser = try_login($base_url, $login, $password);
-my $members = try_retrieve_members($browser, $base_url, "members.html");
-my $chars = build_char_map($members, $num_test_chars, \@alternates);
-load_dkp_stats($base_url, $chars);
-my ($gear_attend_60d_map,
-    $gear_dkp_alltime_map,
-    $spell_attend_60d_map) = calculate_dkp_rankings($chars);
-save_summary_report(
-    $chars,
-    $gear_attend_60d_map,
-    $gear_dkp_alltime_map,
-    $spell_attend_60d_map);
+
+$sess->{ char_limit } = get_char_limit();
+
+$conf->{ alternates } = [ load_alternates("alternates.txt") ];
+$conf->{ spell_tokens } = [ load_spell_tokens("spell_tokens.txt") ];
+$conf->{ skipped_loot } = [ load_skipped_loot("skipped_loot.txt") ];
+
+$sess->{ browser } = try_login($sess->{ base_url }, $sess->{ login }, $sess->{ password });
+$sess->{ members } = try_retrieve_members($sess->{ browser }, $sess->{ base_url }, "members.html");
+$sess->{ chars } = build_char_map($sess->{ members }, $sess->{ char_limit }, $conf->{ alternates });
+
+load_dkp_stats($sess->{ browser }, $sess->{ base_url }, $sess->{ chars }, $conf->{ skipped_loot }, $conf->{ spell_tokens });
+
+save_summary_report($sess->{ chars });
 
 print("Scrape complete. You can now import summary.csv into a spreadsheet program.\nPlease sanity check that the data looks normal!\n");
-if($num_test_chars != -1) {
-    print("As this was just a test scrape, summary.csv will not contain many entries.\n");
-}
 
 ##### Subroutines #####
 
@@ -48,6 +54,7 @@ sub prompt {
     my ($msg) = @_;
     print $msg;
     my $f = <STDIN>;
+    die ("EOF") if !defined $f;
     chomp($f);
     return $f;
 }
@@ -118,23 +125,22 @@ sub load_skipped_loot {
     return @skipped_loot;
 }
 
-sub get_scrape_mode {
-    my $scrape_mode;
-    my $num_test_chars = -1;
+sub get_char_limit {
+    my $char_limit = -1;
     while(1) { 
         print("\nDo you want to do a full scrape of every active member?\n" .
             "If not, the program will run in test mode and scrape 3 characters before stopping.\n");
-        $scrape_mode = prompt("Full scrape y/n?: ");
+        my $scrape_mode = prompt("Full scrape y/n?: ");
         if($scrape_mode =~ /n/i) {
             print("Ok, running in test mode.\n");
-            $num_test_chars = 3;
+            $char_limit = 3;
             last;
         } elsif($scrape_mode =~ /y/i) {
             print("Initiating full scrape, please wait.\n");
             last;
         }
     }
-    return ($scrape_mode, $num_test_chars);
+    return $char_limit;
 }
 
 sub new_browser {
@@ -245,7 +251,7 @@ sub build_char_map {
 # Downloads character DKP stats page, splits the content into new lines
 # at each HTML anchor and writes it to a temp file.
 sub try_retrieve_char_dkp {
-    my ($base_url, $charid) = @_;
+    my ($browser, $base_url, $charid) = @_;
     my $dkp_url = "$base_url/users/characters/character_dkp.php?char=$charid";
     my $dkp_response = $browser->get($dkp_url);
     if ($dkp_response->is_error) {
@@ -262,7 +268,7 @@ sub try_retrieve_char_dkp {
 
 # Fetches the DKP stats for every character and transforms it into summary stats in $chars.
 sub load_dkp_stats {
-    my ($base_url, $chars) = @_;
+    my ($browser, $base_url, $chars, $skipped_loot, $spell_tokens) = @_;
     my ($days_ago_60, $days_ago_30, $days_ago_15, $days_ago_7) = get_recent_dates();
     for my $charid (keys %$chars) {
         sleep 1; # wait between downloads so we don't flood the server
@@ -275,12 +281,12 @@ sub load_dkp_stats {
         my $latest_gear_bracket;
 
         print "Processing: " . $chars->{ $charid }->{ 'name' } . "\n";
-        my $dkp_file = try_retrieve_char_dkp($base_url, $charid);
+        my $dkp_file = try_retrieve_char_dkp($browser, $base_url, $charid);
         while(<$dkp_file>) {
             if(/^.*\[([\w\s\'\"\-\_\`\,]+)\]<.*$/) {  # TODO test negated ] 
                 my $item_name = lc($1);
                 # skip low value item?
-                my $matched_skipped = any {/$item_name/i} @skipped_loot;
+                my $matched_skipped = any {/$item_name/i} @$skipped_loot;
                 if($matched_skipped == 1) {  
                     next;
                 }
@@ -291,7 +297,7 @@ sub load_dkp_stats {
                 if($nextline =~ /^.*(\d{4}-\d{2}-\d{2})<\/td.*$/) {
                     $looted_date = $1;
                 }
-                my $matched_spell = any {/$item_name/i} @spell_tokens;
+                my $matched_spell = any {/$item_name/i} @$spell_tokens;
                 if($matched_spell == 1) {  # case insensitive match of item name on all known spell tokens
                     $spellcount++;
                     $spellcount_sixty++ if $looted_date gt $days_ago_60;
@@ -350,7 +356,11 @@ sub load_dkp_stats {
 }
 
 sub save_summary_report {
-    my ($chars, $gear_attend_60d_map, $gear_dkp_alltime_map, $spell_attend_60d_map) = @_;
+    my ($chars) = @_;
+    my ($gear_attend_60d_map,
+        $gear_dkp_alltime_map,
+        $spell_attend_60d_map) = calculate_dkp_rankings($chars);
+
     open(my $summary_file, ">", "summary.csv") or die ("Could not open summary.csv for writing.");
     print $summary_file "Generated at " . localtime(time) . ". [ Gear: Non-spell loot ] [ Rank Columns: Higher = Better Off ] [ Attendance: Excellent = 75%+ | Solid = 50%+ | Patchy = 25%+ | Low = Under 25%. ]\n";
     print $summary_file "Name,DKP,Attend (Last 60),Gear/Attend Rank (Last 60),Gear/DKP Rank (All Time),Spells/Attend Rank (Last 60),Last Gear Looted,Gear Total (Last 60),Gear Total (All Time)\n";
