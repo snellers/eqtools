@@ -45,7 +45,8 @@ if($num_test_chars != -1) {
 ##### Subroutines #####
 
 sub prompt {
-    print shift;
+    my ($msg) = @_;
+    print $msg;
     my $f = <STDIN>;
     chomp($f);
     return $f;
@@ -59,7 +60,7 @@ sub config_txt_advice {
 
 # load the guild web domain
 sub load_config {
-    my $filename = shift;
+    my ($filename) = @_;
     open my $config_file, '<', $filename or die(config_txt_advice());
     my $guild_name = <$config_file>;
     close($config_file);
@@ -75,7 +76,7 @@ sub load_config {
 
 # load alternate characters so they can be skipped
 sub load_alternates {
-    my $filename = shift;
+    my ($filename) = @_;
     open my $alternates_file, $filename or die("can't open $filename, no alt characters?");
     my @alternates;
     while(<$alternates_file>) {
@@ -89,7 +90,7 @@ sub load_alternates {
 
 # load spell token names so we can count spells separately when scraping member loot history
 sub load_spell_tokens {
-    my $filename = shift;
+    my ($filename) = @_;
     open my $spell_tokens_file, $filename or die("can't open $filename, no spells?");
     my @spell_tokens;
     while(<$spell_tokens_file>) {
@@ -104,7 +105,7 @@ sub load_spell_tokens {
 
 # load names of low value items we don't want to count when adding up someone's loot
 sub load_skipped_loot {
-    my $filename = shift;
+    my ($filename) = @_;
     open my $skipped_loot_file, $filename or die("can't open $filename, no skipped loot?");
     my @skipped_loot;
     while(<$skipped_loot_file>) {
@@ -148,9 +149,7 @@ sub new_browser {
 }
 
 sub try_login {
-    my $base_url = shift;
-    my $login = shift;
-    my $password = shift;
+    my ($base_url, $login, $password) = @_;
     my $browser= new_browser(); 
     my $login_url = "$base_url/recruiting/login.php";
     my %login_form = (
@@ -173,9 +172,7 @@ sub try_login {
 }
 
 sub try_retrieve_members {
-    my $browser = shift;
-    my $base_url = shift;
-    my $filename = shift;
+    my ($browser, $base_url, $filename) = @_;
     print("Retrieving guild member list....\n");
     my $members_url = "$base_url/rapid_raid/members.php";
     my $members_response = $browser->get($members_url);
@@ -195,9 +192,7 @@ sub try_retrieve_members {
 
 # walk the member list, extract character ids, names, dkp and attendance
 sub build_char_map {
-    my $members_file = shift;
-    my $test_char_count = shift;
-    my $alt_chars = shift;
+    my ($members_file, $test_char_count, $alt_chars) = @_;
     my $chars = {};
     while(<$members_file>) {
         if (/^.*character_dkp\.php\?char=(\d+)&amp;gid=\d+'>([:a-zA-Z]+)<.*$/) {
@@ -250,8 +245,7 @@ sub build_char_map {
 # Downloads character DKP stats page, splits the content into new lines
 # at each HTML anchor and writes it to a temp file.
 sub try_retrieve_char_dkp {
-    my $base_url = shift;
-    my $charid = shift;
+    my ($base_url, $charid) = @_;
     my $dkp_url = "$base_url/users/characters/character_dkp.php?char=$charid";
     my $dkp_response = $browser->get($dkp_url);
     if ($dkp_response->is_error) {
@@ -268,8 +262,7 @@ sub try_retrieve_char_dkp {
 
 # Fetches the DKP stats for every character and transforms it into summary stats in $chars.
 sub load_dkp_stats {
-    my $base_url = shift;
-    my $chars = shift;
+    my ($base_url, $chars) = @_;
     my ($days_ago_60, $days_ago_30, $days_ago_15, $days_ago_7) = get_recent_dates();
     for my $charid (keys %$chars) {
         sleep 1; # wait between downloads so we don't flood the server
@@ -357,10 +350,7 @@ sub load_dkp_stats {
 }
 
 sub save_summary_report {
-    my $chars = shift;
-    my $gear_attend_60d_map = shift;
-    my $gear_dkp_alltime_map = shift;
-    my $spell_attend_60d_map = shift;
+    my ($chars, $gear_attend_60d_map, $gear_dkp_alltime_map, $spell_attend_60d_map) = @_;
     open(my $summary_file, ">", "summary.csv") or die ("Could not open summary.csv for writing.");
     print $summary_file "Generated at " . localtime(time) . ". [ Gear: Non-spell loot ] [ Rank Columns: Higher = Better Off ] [ Attendance: Excellent = 75%+ | Solid = 50%+ | Patchy = 25%+ | Low = Under 25%. ]\n";
     print $summary_file "Name,DKP,Attend (Last 60),Gear/Attend Rank (Last 60),Gear/DKP Rank (All Time),Spells/Attend Rank (Last 60),Last Gear Looted,Gear Total (Last 60),Gear Total (All Time)\n";
@@ -383,7 +373,7 @@ sub save_summary_report {
 # Create hashes of character id to their relative ranking, in three different categories.
 # Sort the character id keys by:  gear/attendance60,   gear/all time dkp,  spells/attendance60
 sub calculate_dkp_rankings {
-    my $chars = shift; 
+    my ($chars) = @_;
     my @gear_attend_60d_rank  = sort { $chars->{$a}->{ 'gear_attend_sixty_ratio' } <=> $chars->{$b}->{ 'gear_attend_sixty_ratio' } } (keys(%$chars));
     my @gear_dkp_alltime_rank = sort { $chars->{$a}->{ 'gear_dkp_alltime_ratio' } <=> $chars->{$b}->{ 'gear_dkp_alltime_ratio' } } (keys(%$chars));
     my @spell_attend_60d_rank = sort { $chars->{$a}->{ 'spells_attend_sixty_ratio' } <=> $chars->{$b}->{ 'spells_attend_sixty_ratio' } } (keys(%$chars));
