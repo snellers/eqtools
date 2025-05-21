@@ -388,24 +388,22 @@ sub calculate_dkp_rankings {
 }
 
 sub get_recent_dates {
-    my $sixty_days = 60 * 24 * 60 * 60;
-    my ($old_day, $old_month, $old_year) = (localtime(time - $sixty_days))[3..5];
-    my $days_ago_60 = sprintf('%04d-%02d-%02d', $old_year + 1900, $old_month + 1, $old_day);
-
-    # and the date string for 30 days ago
-    my $thirty_days = 30 * 24 * 60 * 60;
-    ($old_day, $old_month, $old_year) = (localtime(time - $thirty_days))[3..5];
-    my $days_ago_30 = sprintf('%04d-%02d-%02d', $old_year + 1900, $old_month + 1, $old_day);
-
-    # and the date string for 15 days ago
-    my $fifteen_days = 15 * 24 * 60 * 60;
-    ($old_day, $old_month, $old_year) = (localtime(time - $fifteen_days))[3..5];
-    my $days_ago_15 = sprintf('%04d-%02d-%02d', $old_year + 1900, $old_month + 1, $old_day);
-
-    # and the date string for 7 days ago
-    my $seven_days = 7 * 24 * 60 * 60;
-    ($old_day, $old_month, $old_year) = (localtime(time - $seven_days))[3..5];
-    my $days_ago_7 = sprintf('%04d-%02d-%02d', $old_year + 1900, $old_month + 1, $old_day);
+    my $days_ago_60 = format_date(days_in_seconds(60));
+    my $days_ago_30 = format_date(days_in_seconds(30));
+    my $days_ago_15 = format_date(days_in_seconds(15));
+    my $days_ago_7 = format_date(days_in_seconds(7));
     return ($days_ago_60, $days_ago_30, $days_ago_15, $days_ago_7);
+}
+
+# Returns a date string in YYYY-MM-DD format, $seconds_ago before today.
+sub format_date {
+    my ($seconds_ago) = @_;
+    my ($old_day, $old_month, $old_year) = (localtime(time - $seconds_ago))[3..5];
+    my $formatted_date = sprintf('%04d-%02d-%02d', $old_year + 1900, $old_month + 1, $old_day);
+    return $formatted_date;
+}
+sub days_in_seconds {
+    my ($days_ago) = @_;
+    return $days_ago * 24 * 60 * 60;
 }
 
