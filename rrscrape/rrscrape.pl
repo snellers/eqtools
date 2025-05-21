@@ -61,7 +61,8 @@ sub prompt {
 
 sub config_txt_advice {
     return "Could not load a valid config.txt file. Please create a file containing one line.\n" .
-    "The line must contain your guild's custom hostname on the Guild Launch site.\n" .
+    "The line must contain your guild's custom hostname on the Guild Launch site\n" .
+    "without the leading https://\n" .
     "e.g. if you normally log in to myguild.guildlaunch.com then you would put myguild in the file.\n";
 }
 
@@ -72,11 +73,8 @@ sub load_config {
     my $guild_name = <$config_file>;
     close($config_file);
     chomp($guild_name);
-    if ($guild_name eq "") {
+    if ($guild_name eq "" or $guild_name =~ /http/i) {
         die(config_txt_advice());
-    }
-    if ($guild_name =~ /http/) {
-        die("Edit config.txt and remove the http URL scheme from your guild name.");
     }
     return $guild_name;
 }
@@ -280,7 +278,7 @@ sub load_dkp_stats {
         my $latest_gear_date = '1900-01-01';
         my $latest_gear_bracket;
 
-        print "Processing: " . $chars->{ $charid }->{ 'name' } . "\n";
+        print "Processing: " . $chars->{ $charid }->{ name } . "\n";
         my $dkp_file = try_retrieve_char_dkp($browser, $base_url, $charid);
         while(<$dkp_file>) {
             if(/^.*\[([\w\s\'\"\-\_\`\,]+)\]<.*$/) {  # TODO test negated ] 
@@ -316,11 +314,11 @@ sub load_dkp_stats {
 
         my $attend_bracket_sixty = '4 (Low)';
 
-        if($chars->{ $charid }->{ 'attend_sixty' } >= 75) {
+        if($chars->{ $charid }->{ attend_sixty } >= 75) {
             $attend_bracket_sixty = '1 (Excellent)';
-        } elsif( $chars->{ $charid }->{ 'attend_sixty' } >= 50) {
+        } elsif( $chars->{ $charid }->{ attend_sixty } >= 50) {
             $attend_bracket_sixty = '2 (Solid)';
-        } elsif( $chars->{ $charid }->{ 'attend_sixty' } >= 25) {
+        } elsif( $chars->{ $charid }->{ attend_sixty } >= 25) {
             $attend_bracket_sixty = '3 (Patchy)';
         }
 
@@ -341,17 +339,17 @@ sub load_dkp_stats {
         $latest_gear_bracket = $latest_gear_bracket . ' (' . $latest_gear_date . ')';
 
         # now add computed values to the character map
-        $chars->{ $charid }->{ 'attend_bracket_sixty'} = $attend_bracket_sixty;
-        $chars->{ $charid }->{ 'latest_gear_date'} = $latest_gear_date;
-        $chars->{ $charid }->{ 'latest_gear_bracket'} = $latest_gear_bracket;
-        $chars->{ $charid }->{ 'gearcount_sixty'} = $gearcount_sixty;
-        $chars->{ $charid }->{ 'gearcount'} = $gearcount;
-        $chars->{ $charid }->{ 'spellcount'} = $spellcount;
-        $chars->{ $charid }->{ 'spellcount_sixty'} = $spellcount_sixty;
-        $chars->{ $charid }->{ 'total_loot'} = $total_loot;
-        $chars->{ $charid }->{ 'gear_attend_sixty_ratio'} = ($gearcount_sixty / $chars->{ $charid }->{ 'attend_sixty' }) * 100;
-        $chars->{ $charid }->{ 'gear_dkp_alltime_ratio'} = ($gearcount / $chars->{ $charid }->{ 'dkp' }) * 100;
-        $chars->{ $charid }->{ 'spells_attend_sixty_ratio'} = ($spellcount_sixty / $chars->{ $charid }->{ 'attend_sixty' }) * 100;
+        $chars->{ $charid }->{ attend_bracket_sixty} = $attend_bracket_sixty;
+        $chars->{ $charid }->{ latest_gear_date} = $latest_gear_date;
+        $chars->{ $charid }->{ latest_gear_bracket} = $latest_gear_bracket;
+        $chars->{ $charid }->{ gearcount_sixty} = $gearcount_sixty;
+        $chars->{ $charid }->{ gearcount} = $gearcount;
+        $chars->{ $charid }->{ spellcount} = $spellcount;
+        $chars->{ $charid }->{ spellcount_sixty} = $spellcount_sixty;
+        $chars->{ $charid }->{ total_loot} = $total_loot;
+        $chars->{ $charid }->{ gear_attend_sixty_ratio} = ($gearcount_sixty / $chars->{ $charid }->{ attend_sixty }) * 100;
+        $chars->{ $charid }->{ gear_dkp_alltime_ratio} = ($gearcount / $chars->{ $charid }->{ dkp }) * 100;
+        $chars->{ $charid }->{ spells_attend_sixty_ratio} = ($spellcount_sixty / $chars->{ $charid }->{ attend_sixty }) * 100;
     }
 }
 
@@ -366,15 +364,15 @@ sub save_summary_report {
     print $summary_file "Name,DKP,Attend (Last 60),Gear/Attend Rank (Last 60),Gear/DKP Rank (All Time),Spells/Attend Rank (Last 60),Last Gear Looted,Gear Total (Last 60),Gear Total (All Time)\n";
     for my $charid (keys %$chars) {
         print $summary_file 
-        $chars->{ $charid }->{ 'name' } . "," .
-        $chars->{ $charid }->{ 'dkp' } . "," .
-        $chars->{ $charid }->{ 'attend_bracket_sixty' } . "," .
+        $chars->{ $charid }->{ name } . "," .
+        $chars->{ $charid }->{ dkp } . "," .
+        $chars->{ $charid }->{ attend_bracket_sixty } . "," .
         %$gear_attend_60d_map{ $charid } . "," .
         %$gear_dkp_alltime_map{ $charid } . "," .
         %$spell_attend_60d_map{ $charid } . "," .
-        $chars->{ $charid }->{ 'latest_gear_bracket' } . "," .
-        $chars->{ $charid }->{ 'gearcount_sixty' } . "," .
-        $chars->{ $charid }->{ 'gearcount' } . 
+        $chars->{ $charid }->{ latest_gear_bracket } . "," .
+        $chars->{ $charid }->{ gearcount_sixty } . "," .
+        $chars->{ $charid }->{ gearcount } . 
         "\n";
     }
     close($summary_file);
@@ -384,9 +382,9 @@ sub save_summary_report {
 # Sort the character id keys by:  gear/attendance60,   gear/all time dkp,  spells/attendance60
 sub calculate_dkp_rankings {
     my ($chars) = @_;
-    my @gear_attend_60d_rank  = sort { $chars->{$a}->{ 'gear_attend_sixty_ratio' } <=> $chars->{$b}->{ 'gear_attend_sixty_ratio' } } (keys(%$chars));
-    my @gear_dkp_alltime_rank = sort { $chars->{$a}->{ 'gear_dkp_alltime_ratio' } <=> $chars->{$b}->{ 'gear_dkp_alltime_ratio' } } (keys(%$chars));
-    my @spell_attend_60d_rank = sort { $chars->{$a}->{ 'spells_attend_sixty_ratio' } <=> $chars->{$b}->{ 'spells_attend_sixty_ratio' } } (keys(%$chars));
+    my @gear_attend_60d_rank  = sort { $chars->{$a}->{ gear_attend_sixty_ratio } <=> $chars->{$b}->{ gear_attend_sixty_ratio } } (keys(%$chars));
+    my @gear_dkp_alltime_rank = sort { $chars->{$a}->{ gear_dkp_alltime_ratio } <=> $chars->{$b}->{ gear_dkp_alltime_ratio } } (keys(%$chars));
+    my @spell_attend_60d_rank = sort { $chars->{$a}->{ spells_attend_sixty_ratio } <=> $chars->{$b}->{ spells_attend_sixty_ratio } } (keys(%$chars));
     my %gear_attend_60d_map;
     my %gear_dkp_alltime_map;
     my %spell_attend_60d_map;
