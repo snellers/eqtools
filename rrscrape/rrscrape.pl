@@ -33,10 +33,12 @@ if($sess->{ login } eq "" or $sess->{ password } eq "") {
 }
 
 $sess->{ char_limit } = get_char_limit();
-
-$conf->{ alternates } = [ load_alternates("alternates.txt") ];
-$conf->{ spell_tokens } = [ load_spell_tokens("spell_tokens.txt") ];
-$conf->{ skipped_loot } = [ load_skipped_loot("skipped_loot.txt") ];
+# load alternate characters so they can be skipped
+$conf->{ alternates } = [ load_list("alternates.txt") ];
+# load spell token names so we can count spells separately when scraping member loot history
+$conf->{ spell_tokens } = [ load_list("spell_tokens.txt") ];
+# load names of low value items we don't want to count when adding up someone's loot
+$conf->{ skipped_loot } = [ load_list("skipped_loot.txt") ];
 
 $sess->{ browser } = try_login($sess->{ base_url }, $sess->{ login }, $sess->{ password });
 $sess->{ members } = try_retrieve_members($sess->{ browser }, $sess->{ base_url }, "members.html");
@@ -69,58 +71,28 @@ sub config_txt_advice {
 # load the guild web domain
 sub load_config {
     my ($filename) = @_;
-    open my $config_file, '<', $filename or die(config_txt_advice());
-    my $guild_name = <$config_file>;
-    close($config_file);
-    chomp($guild_name);
+    die(config_txt_advice()) unless -f $filename;
+    my @list = load_list($filename);
+    die(config_txt_advice()) if @list == 0;
+    my $guild_name = $list[0];
     if ($guild_name eq "" or $guild_name =~ /http/i) {
         die(config_txt_advice());
     }
     return $guild_name;
 }
 
-# load alternate characters so they can be skipped
-sub load_alternates {
+sub load_list {
     my ($filename) = @_;
-    open my $alternates_file, $filename or die("can't open $filename, no alt characters?");
-    my @alternates;
-    while(<$alternates_file>) {
+    open my $handle, $filename or die("can't open $filename");
+    my @list;
+    while(<$handle>) {
         chomp;
         next if /^$/;
-        push(@alternates, $_);
+        push(@list, $_);
     }
-    close($alternates_file);
-    return @alternates;
-}
-
-# load spell token names so we can count spells separately when scraping member loot history
-sub load_spell_tokens {
-    my ($filename) = @_;
-    open my $spell_tokens_file, $filename or die("can't open $filename, no spells?");
-    my @spell_tokens;
-    while(<$spell_tokens_file>) {
-        chomp;
-        next if /^$/;
-        push(@spell_tokens, $_);
-    }
-    close($spell_tokens_file);
-    print("Loaded $#spell_tokens spell tokens from $filename.\n");
-    return @spell_tokens;
-}
-
-# load names of low value items we don't want to count when adding up someone's loot
-sub load_skipped_loot {
-    my ($filename) = @_;
-    open my $skipped_loot_file, $filename or die("can't open $filename, no skipped loot?");
-    my @skipped_loot;
-    while(<$skipped_loot_file>) {
-        chomp;
-        next if /^$/;
-        push(@skipped_loot, $_);
-    }
-    close($skipped_loot_file);
-    print("Loaded $#skipped_loot items from $filename that will be skipped during analysis.\n");
-    return @skipped_loot;
+    close($handle);
+    print("Loaded " . scalar(@list) . " entries from $filename.\n");
+    return @list;
 }
 
 sub get_char_limit {
