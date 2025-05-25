@@ -12,7 +12,7 @@ into a spreadsheet and go from there.
 
 There are two versions of the script available in this git repository:
 
-- This version is written in `python`.
+- This version is written in `perl`.
 - The other version, `rrscrape-py`, is written in `python` and does the same thing.
 
 ## How It Works
