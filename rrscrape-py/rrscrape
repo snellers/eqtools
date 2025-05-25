@@ -1,0 +1,17 @@
+#!/usr/bin/env bash
+# This is a launcher script for use on Linux, MacOS and other UNIX variants.
+# It checks that the python virtual environment is configured and up to date before running the python script.
+set -o pipefail
+which -s uv
+if [ $? -ne 0 ]; then
+  echo "The 'uv' python package manager count not be found. Did you follow the setup steps described in the README?"
+  exit 1
+fi
+if [ ! -d .venv ]; then
+  echo "The .venv directory was not found. Did you did you follow the setup steps described in the README?"
+  exit 1
+fi
+set -e
+source .venv/bin/activate
+uv sync -q
+python3 ./rrscrape.py
