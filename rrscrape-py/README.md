@@ -44,27 +44,55 @@ The script may stop working if the site changes.
 
 ### Install Required Tools
 
-The script requires a recent version of `python`. This is available by default
-on modern versions of Linux and MacOS.
+#### Install Python
 
-On Windows:
+`rrscrape` requires a recent version of `python`. This is available by default
+on modern versions of **Linux** and **MacOS**.
+
+On **Windows**:
 - Install [miniconda](https://docs.conda.io/en/latest/miniconda.html#installing)
 - There should be a direct download link, registration is usually optional.
 - Python is available in the Microsoft Store too.
 
+#### Setup Python Environment
+
+Once `python` is installed, you'll need to run a script that will configure rrscrape's python environment.
+You only need to do this once.
+
+On **Linux** and **MacOS**:
+
+Open a terminal and from the project directory run this script:
+```bash
+./setup-rrscrape
+```
+
+On **Windows**:
+
+From the Windows task bar, launch `Anaconda Prompt` (miniconda3).
+This will open a terminal session where python is available.
+
+Change to the directory where this script has been put and run the setup script, e.g.:
+```bash
+cd Documents\rrscrape-py
+setup-rrscrape
+```
+
+
 
 ### Configure Guild Name
 
-Before running the script, you'll need to create a text file in the same folder as the script
+Before you can use `rrscrape`, you'll need to create a text file in the same folder as the script
 called `config.txt`. It must contain a line that specifies your guild's custom hostname
 on the Guild Launch site (without the URL scheme) e.g. if you normally log into 
 `myguild.guildlaunch.com` put `myguild` in the file.
 
 ### Running on Linux/Mac
 
+Open a terminal and from the project directory run this launcher script:
 ```bash
-./rrscrape.py
+./rrscrape
 ```
+Note: you should avoid executing the file `rrscrape.py` directly as it's designed to be run using the launcher script:
 
 ### Running on Windows
 
@@ -74,7 +102,7 @@ This will open a terminal session where python is available.
 Change to the directory where this script has been put and run it, for example:
 ```bash
 cd Documents\rrscrape-py
-python rrscrape.py
+rrscrape
 ```
 
 ### Ongoing Customization
