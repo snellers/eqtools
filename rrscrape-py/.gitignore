@@ -4,5 +4,4 @@ members.html
 summary.csv
 *~
 *.bak
-_Inline/
-
+.idea
