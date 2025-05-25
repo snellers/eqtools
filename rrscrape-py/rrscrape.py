@@ -2,6 +2,7 @@
 import os
 import re
 import time
+import sys
 from datetime import datetime, timedelta
 import http.cookies
 import http.cookiejar
@@ -11,20 +12,18 @@ from typing import List, Dict
 
 class Config:
     def __init__(self, config_file, alternates_file, spell_tokens_file, skipped_loot_file):
-        self.load_guild_name(config_file)
+        self.guild_name = self.load_guild_name(config_file)
         self.load_alternates(alternates_file)
         self.load_spell_tokens(spell_tokens_file)
         self.load_skipped_loot(skipped_loot_file)
 
     def load_guild_name(self, config_file):
-        if not os.path.isfile(config_file):
-            raise Exception(self.config_txt_advice())
-        list_ = self.load_list(config_file)
-        if len(list_) == 0:
-            raise Exception(self.config_txt_advice())
-        self.guild_name = list_[0]
-        if self.guild_name == "" or "http" in self.guild_name.lower():
-            raise Exception(self.config_txt_advice())
+        with open(config_file) as f:
+            name = f.read().strip().split(' ')[0].lower()
+            if not name or "http" in name:
+                print(self.config_txt_advice())
+                sys.exit(1)
+            return name
 
     def load_alternates(self, alternates_file):
         self.alternates = self.load_list(alternates_file)
@@ -42,10 +41,14 @@ class Config:
                 "e.g. if you normally log in to myguild.guildlaunch.com then you would put myguild in the file.\n")
 
     def load_list(self, filename):
-        with open(filename, 'r') as handle:
-            list_ = [line.strip() for line in handle if line.strip()]
-        print(f"Loaded {len(list_)} entries from {filename}.")
-        return list_
+        try:
+            with open(filename, 'r') as handle:
+                list_ = [line.strip() for line in handle if line.strip()]
+            print(f"Loaded {len(list_)} entries from {filename}.")
+            return list_
+        except FileNotFoundError:
+            print(f"File not found: {filename}")
+            sys.exit(1)
 
 class Scraper:
     char_name_line = re.compile(r'^.*character_dkp\.php\?char=(\d+)&amp;gid=\d+\'>([a-zA-Z]+)<')
