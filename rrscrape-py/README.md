@@ -1,4 +1,4 @@
-rrscrape (perl edition)
+rrscrape (python edition)
 ----------------
 
 `rrscrape` is a tool intended for EverQuest guilds that track their raid
@@ -13,7 +13,8 @@ into a spreadsheet and go from there.
 There are two versions of the script available in this git repository:
 
 - This version is written in `python`.
-- The other version, `rrscrape-py`, is written in `python` and does the same thing.
+- The other version is written in `perl` and does the same thing.
+
 
 ## How It Works
 
@@ -43,17 +44,14 @@ The script may stop working if the site changes.
 
 ### Install Required Tools
 
-The script requires `perl`. This is available by default on Linux and MacOS.
-On Windows, install Strawberry Perl. 
+The script requires a recent version of `python`. This is available by default
+on modern versions of Linux and MacOS.
 
-Install some required perl modules by running this in a terminal (this may
-take a few minutes to complete):
+On Windows:
+- Install [miniconda](https://docs.conda.io/en/latest/miniconda.html#installing)
+- There should be a direct download link, registration is usually optional.
+- Python is available in the Microsoft Store too.
 
-```bash
-cpan List::MoreUtils HTTP::Cookies HTTP::Request LWP LWP::Protocol::https Net::SSLea
-```
-`cpan` itself is normally included when `perl` is installed. Some distributions of perl
-come with bundled with these modules.
 
 ### Configure Guild Name
 
@@ -65,14 +63,18 @@ on the Guild Launch site (without the URL scheme) e.g. if you normally log into
 ### Running on Linux/Mac
 
 ```bash
-rrscrape.sh
+./rrscrape.py
 ```
 
 ### Running on Windows
 
-From a terminal window, or via a Windows desktop shortcut, run the script:
+From the Windows task bar, launch `Anaconda Prompt` (miniconda3).
+This will open a terminal session where python is available.
+
+Change to the directory where this script has been put and run it, for example:
 ```bash
-rrscrape.bat
+cd Documents\rrscrape-py
+python rrscrape.py
 ```
 
 ### Ongoing Customization

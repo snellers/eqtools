@@ -1,0 +1,3 @@
+example skipped loot item 1
+example skipped loot item 2
+
