@@ -18,12 +18,16 @@ class Config:
         self.load_skipped_loot(skipped_loot_file)
 
     def load_guild_name(self, config_file):
-        with open(config_file) as f:
-            name = f.read().strip().split(' ')[0].lower()
-            if not name or "http" in name:
-                print(self.config_txt_advice())
-                sys.exit(1)
-            return name
+        try:
+            with open(config_file) as f:
+                name = f.read().strip().split(' ')[0].lower()
+                if not name or "http" in name:
+                    print(self.config_txt_advice())
+                    sys.exit(1)
+                return name
+        except FileNotFoundError:
+            print(self.config_txt_advice())
+            sys.exit(1)
 
     def load_alternates(self, alternates_file):
         self.alternates = self.load_list(alternates_file)
@@ -35,8 +39,7 @@ class Config:
         self.skipped_loot = self.load_list(skipped_loot_file)
 
     def config_txt_advice(self):
-        return ("Could not load a valid config.txt file. Please create a file containing one line.\n"
-                "The line must contain your guild's custom hostname on the Guild Launch site\n"
+        return ("Please create a file called config.txt containing your guild's custom hostname on the Guild Launch site\n"
                 "without the leading https://\n"
                 "e.g. if you normally log in to myguild.guildlaunch.com then you would put myguild in the file.\n")
 
@@ -72,8 +75,11 @@ class Scraper:
 
     def prompt(self, msg: str):
         print(msg, end='')
-        f = input()
-        return f
+        try:
+            f = input()
+            return f
+        except KeyboardInterrupt:
+            sys.exit(0)
 
     def try_login(self):
         print(f"The script will log into {self.base_url}")

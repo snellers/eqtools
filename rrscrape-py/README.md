@@ -42,42 +42,11 @@ The script may stop working if the site changes.
 
 ## Usage
 
-### Install Required Tools
+As `rrscrape` is a `python` script, it requires a version of python to be present on your system.
 
-#### Install Python
-
-`rrscrape` requires a recent version of `python`. This is available by default
-on modern versions of **Linux** and **MacOS**.
-
-On **Windows**:
-- Install [miniconda](https://docs.conda.io/en/latest/miniconda.html#installing)
-- There should be a direct download link, registration is usually optional.
-- Python is available in the Microsoft Store too.
-
-#### Setup Python Environment
-
-Once `python` is installed, you'll need to run a script that will configure rrscrape's python environment.
-You only need to do this once.
-
-On **Linux** and **MacOS**:
-
-Open a terminal and from the project directory run this script:
-```bash
-./setup-rrscrape
-```
-
-On **Windows**:
-
-From the Windows task bar, launch `Anaconda Prompt` (miniconda3).
-This will open a terminal session where python is available.
-
-Change to the directory where this script has been put and run the setup script, e.g.:
-```bash
-cd Documents\rrscrape-py
-setup-rrscrape
-```
-
-
+The `rrscrape` script sets that up for you automatically. Behind the scenes, it uses a tool called `uv`
+to manage the python environment. If you have any other python based apps on your device, this won't
+interfere with those.
 
 ### Configure Guild Name
 
@@ -88,21 +57,21 @@ on the Guild Launch site (without the URL scheme) e.g. if you normally log into
 
 ### Running on Linux/Mac
 
-Open a terminal and from the project directory run this launcher script:
+Open a terminal and from the project directory run this launcher script e.g.:
 ```bash
+cd tools/rrscrape-py
 ./rrscrape
 ```
 Note: you should avoid executing the file `rrscrape.py` directly as it's designed to be run using the launcher script:
 
 ### Running on Windows
 
-From the Windows task bar, launch `Anaconda Prompt` (miniconda3).
-This will open a terminal session where python is available.
+From the Windows task bar, launch `Terminal`.
 
 Change to the directory where this script has been put and run it, for example:
 ```bash
 cd Documents\rrscrape-py
-rrscrape
+.\rrscrape
 ```
 
 ### Ongoing Customization
@@ -123,5 +92,3 @@ asked about performing a full scrape. This will summarize only a few characters.
 This script is not affiliated with the guildlaunch site or the game Everquest. 
 Please use this script responsibly.
 Game related materials are copyright of their respective owners.
-
-

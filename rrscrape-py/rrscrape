@@ -4,13 +4,15 @@
 set -o pipefail
 which -s uv
 if [ $? -ne 0 ]; then
-  echo "The 'uv' python package manager count not be found. Did you follow the setup steps described in the README?"
-  exit 1
+    curl -LsSf https://astral.sh/uv/install.sh | sh
 fi
+# Create the python virtual environment for the project if it's missing
 if [ ! -d .venv ]; then
-  echo "The .venv directory was not found. Did you did you follow the setup steps described in the README?"
-  exit 1
+    uv venv
+    source .venv/bin/activate
+    uv pip install -r pyproject.toml
 fi
+# Run rrscrape using the project's virtual environment
 set -e
 source .venv/bin/activate
 uv sync -q
