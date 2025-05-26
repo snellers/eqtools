@@ -1,0 +1,7 @@
+[project]
+name = "countspells"
+version = "0.1"
+dependencies = [
+]
+requires-python = ">= 3.8"
+license = "MIT"

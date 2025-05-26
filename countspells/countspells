@@ -16,4 +16,4 @@ fi
 set -e
 source .venv/bin/activate
 uv sync -q
-python3 ./rrscrape.py
+python3 ./countspells.py

@@ -16,5 +16,5 @@ if not exist .venv (
 REM Run using the project's virtual environment
 call .venv\Scripts\activate.bat
 uv sync -q
-python rrscrape.py
+python countspells.py
 call deactivate

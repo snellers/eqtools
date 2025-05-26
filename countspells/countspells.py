@@ -14,7 +14,7 @@ from collections import Counter
 
 def countspells(args):
     if len(args) != 3:
-        print('Usage: python {} inputfile.txt outputfile.csv'.format(args[0]))
+        print('Usage: {} inputfile.txt outputfile.csv'.format(args[0]))
         sys.exit(1)
     outfile = open(args[2], "w")
     spells = re.findall(r'Spell: ([^\t]+)', open(args[1]).read())
