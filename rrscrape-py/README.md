@@ -44,7 +44,7 @@ The script may stop working if the site changes.
 
 As `rrscrape` is a `python` script, it requires a version of python to be present on your system.
 
-The `rrscrape` script sets that up for you automatically. Behind the scenes, it uses a tool called `uv`
+The `rrscrape` script sets that up for you automatically. Behind the scenes, it uses a tool called [uv](https://docs.astral.sh/uv/)
 to manage the python environment. If you have any other python based apps on your device, this won't
 interfere with those.
 
