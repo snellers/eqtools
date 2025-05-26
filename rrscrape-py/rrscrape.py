@@ -59,7 +59,6 @@ class GuildMembersScraper:
     dkp_earned_re = re.compile(r'dkp_earned')
     dkp_attend_re = re.compile(r'dkp_[a-z]+_attend')
     parens_pct_re = re.compile(r'[\(\)%]')
-
     def __init__(self, html, char_limit):
         self.soup = BeautifulSoup(html, 'lxml')
         self.char_limit = char_limit
@@ -104,7 +103,6 @@ class GuildMembersScraper:
 class ItemHistoryScraper:
     item_name_re = re.compile(r'\[.*\]')
     loot_date_re = re.compile(r'(\d{4}-\d{2}-\d{2})')
-
     def __init__(self, html):
         self.soup = BeautifulSoup(html, 'lxml')
 
@@ -130,9 +128,6 @@ class ItemHistoryScraper:
 
 
 class Scraper:
-    item_name_line = re.compile(r'^.*\[([\w\s\'\"\-\_\`\,]+)\]<.*$')
-    looted_date_line = re.compile(r'^.*(\d{4}-\d{2}-\d{2})<\/td.*$')
-
     def __init__(self, config: Config):
         self.config = config
         self.base_url = f"https://{config.guild_name}.guildlaunch.com"
