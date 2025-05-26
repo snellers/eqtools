@@ -1,19 +1,9 @@
 #!/usr/bin/env bash
 # This is a launcher script for use on Linux, MacOS and other UNIX variants.
-# It checks that the python virtual environment is configured and up to date before running the python script.
+# It checks that uv is installed then runs the script in a python virtual environment.
 set -o pipefail
 which -s uv
 if [ $? -ne 0 ]; then
     curl -LsSf https://astral.sh/uv/install.sh | sh
 fi
-# Create the python virtual environment for the project if it's missing
-if [ ! -d .venv ]; then
-    uv venv
-    source .venv/bin/activate
-    uv pip install -r pyproject.toml
-fi
-# Run using the project's virtual environment
-set -e
-source .venv/bin/activate
-uv sync -q
-python3 ./rrscrape.py
+uv run ./rrscrape.py
