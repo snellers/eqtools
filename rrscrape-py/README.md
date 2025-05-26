@@ -23,7 +23,7 @@ There are two versions of the script available in this git repository:
 - It downloads a list of the guild members from the site's member roster page.
 - For each character, it checks if their name is found in a local file called
   `alternates.txt`. "Alt" characters are skipped during summary generation.
-- Any character that has not attended any raids recently is skipped.
+- Any character that has not attended any raids in the last 60 days is skipped.
 - It downloads the raid and loot statistics for each character.
 - It generates a `summary.csv` file containing
   a summary of each character's attendance and loot.

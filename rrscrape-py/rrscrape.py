@@ -9,6 +9,7 @@ import http.cookiejar
 from urllib import request, parse
 import requests
 from typing import List, Dict
+from bs4 import BeautifulSoup
 
 class Config:
     def __init__(self, config_file, alternates_file, spell_tokens_file, skipped_loot_file):
@@ -53,10 +54,82 @@ class Config:
             print(f"File not found: {filename}")
             sys.exit(1)
 
+class GuildMembersScraper:
+    character_dkp_re = re.compile(r'character_dkp\.php')
+    dkp_earned_re = re.compile(r'dkp_earned')
+    dkp_attend_re = re.compile(r'dkp_[a-z]+_attend')
+    parens_pct_re = re.compile(r'[\(\)%]')
+
+    def __init__(self, html, char_limit):
+        self.soup = BeautifulSoup(html, 'lxml')
+        self.char_limit = char_limit
+
+    def parse(self):
+        def is_td_dkp_span(tag):
+            return tag.name == 'td' and tag.find('span', class_ = self.dkp_attend_re) is not None
+        form = self.soup.find('form', attrs = {'action': '', 'method': 'post'})
+        chars = {}
+        if form is None:
+            print("A HTML form containing the guild characters could not be found.\nThere was either a problem loading the page or the page layout has changed.")
+            return chars
+        for row_tag in form.find_all('tr'):
+            compare_char_input = row_tag.find('input', attrs = {'name': 'compare_char_id[]'})
+            char_anchor = row_tag.find('a', href = self.character_dkp_re)
+            dkp_earned_span = row_tag.find('span', class_ = self.dkp_earned_re)
+            if compare_char_input is None or char_anchor is None or dkp_earned_span is None:
+                continue
+            if not (char_id := compare_char_input['value']):
+                continue
+            dkp_span_tds = row_tag.find_all(is_td_dkp_span)
+            if dkp_span_tds is None:
+                continue
+            # There are two DKP attendance ratio columns, the second one tracking 60 day attendance is needed.
+            dkp_60day_span = dkp_span_tds[1].find('span', class_ = self.dkp_attend_re)
+            charname = char_anchor.text.strip()
+            dkp_earned = float(dkp_earned_span.text.strip().replace(',', ''))
+            dkp_60_day_attended = int(re.sub(self.parens_pct_re, '', dkp_60day_span.text.strip()))
+            # Skip characters who are inactive raiders
+            if dkp_earned == 0 or dkp_60_day_attended == 0:
+                continue
+            chars[char_id] = {
+                    'id': char_id,
+                    'name': charname,
+                    'dkp': dkp_earned,
+                    'attend_sixty': dkp_60_day_attended
+            }
+            if 0 < self.char_limit <= len(chars):
+                break
+        return chars
+
+class ItemHistoryScraper:
+    item_name_re = re.compile(r'\[.*\]')
+    loot_date_re = re.compile(r'(\d{4}-\d{2}-\d{2})')
+
+    def __init__(self, html):
+        self.soup = BeautifulSoup(html, 'lxml')
+
+    def parse(self):
+        loot = []
+        if not (item_history_header := self.soup.find('h4', string = 'Item History')):
+            print("Could not locate the Item History table in the Character DKP page.\nThere was either a problem loading the page or the page layout has changed.")
+            return loot
+        if not (loot_table := item_history_header.find_next_sibling('table', class_="forumline")):
+            return loot
+        for row_tag in loot_table.find_all('tr'):
+            # The item names sit within an anchor tag, and are surrounded by square brackets. However, the page is quite
+            # complicated, with some items being nested within a span. There are at least three variations. Fortunately
+            # extracting the anchor text suffices.
+            if not (item_anchor := row_tag.find('a', string=re.compile(self.item_name_re))):
+                continue
+            item_name = item_anchor.text.strip().replace('[', '').replace(']', '')
+            if not (loot_date_td := row_tag.find('td', string=re.compile(self.loot_date_re))):
+                continue
+            loot_date = loot_date_td.text.strip()
+            loot.append({'name': item_name, 'loot_date': loot_date})
+        return loot
+
+
 class Scraper:
-    char_name_line = re.compile(r'^.*character_dkp\.php\?char=(\d+)&amp;gid=\d+\'>([a-zA-Z]+)<')
-    dkp_earned_line = re.compile(r'^.*dkp_earned[\"\']>([0-9,\.]+)<')
-    dkp_attend_line = re.compile(r'^.*dkp_[a-z]+_attend[\'\"]>\(([0-9]+)\%\)<')
     item_name_line = re.compile(r'^.*\[([\w\s\'\"\-\_\`\,]+)\]<.*$')
     looted_date_line = re.compile(r'^.*(\d{4}-\d{2}-\d{2})<\/td.*$')
 
@@ -129,52 +202,12 @@ class Scraper:
             raise Exception("Didn't find expected content in the members page.")
 
     def build_char_map(self):
-        def get_next_line_generator(lines):
-            for line in lines:
-                yield line
-        self.chars = {}
         with open("members.html", 'r', encoding='utf-8') as file:
-            lines = list(file)
-            line_gen = get_next_line_generator(lines)
-            for line in line_gen:
-                if not (char_match := self.char_name_line.match(line)):
-                    continue
-                charid, charname = char_match.groups()
-                if any(re.search(charname, alt_char, re.IGNORECASE) for alt_char in self.config.alternates):
-                    continue
-                dkp = None
-                attend_sixty = None
-                subline_iter = line_gen
-                while dkp is None or attend_sixty is None:
-                    next_sub = next(subline_iter)
-                    if dkp_earned_match := self.dkp_earned_line.match(next_sub):
-                        dkp = float(dkp_earned_match.group(1).replace(',', ''))
-                    elif dkp_attend_match := self.dkp_attend_line.match(next_sub):
-                        # We expect there to be two dkp attend lines adjacent, the 2nd is the one of interest.
-                        next_sub = next(subline_iter)
-                        if dkp_attend_match := self.dkp_attend_line.match(next_sub):
-                            attend_sixty = int(dkp_attend_match.group(1))
-                        else:
-                            print(f"Warning: skipping character {charname} because dkp attendance table cell was not found. The format of the page may have changed!")
-                            break;
-                if dkp is None or attend_sixty is None:
-                    print(f"Warning: skipping character {charname} because dkp or attendance table cells could not be found. The format of the page may have changed!")
-                    continue
-                # Skip characters who are inactive raiders
-                if dkp == 0 or attend_sixty == 0:
-                    continue
-                self.chars[charid] = {
-                    'id': charid,
-                    'name': charname,
-                    'dkp': dkp,
-                    'attend_sixty': attend_sixty
-                }
-                if self.char_limit > 0 and len(self.chars) >= self.char_limit:
-                    break
-
-        membercount = len(self.chars)
-        print(f"Loaded {membercount} guild members.")
-        if membercount == 0:
+            html = file.read()
+            self.chars = GuildMembersScraper(html, self.char_limit).parse()
+        member_count = len(self.chars)
+        print(f"Loaded {member_count} guild members.")
+        if member_count == 0:
             raise Exception("At least one guild member should've been found. Something went wrong, try again later.")
 
     def try_retrieve_char_dkp(self, charid):
@@ -208,37 +241,28 @@ class Scraper:
             gearcount_sixty = 0
             total_loot = 0
             latest_gear_date = '1900-01-01'
-            latest_gear_bracket = None
-    
             time.sleep(1) # wait between downloads so we don't flood the server
             print("Processing: " + self.chars[charid]['name'])
             dkp_file_content = self.try_retrieve_char_dkp(charid)
-            lines = dkp_file_content.split('\n')
-    
-            for line in lines:
-                if not (item_match := self.item_name_line.match(line)):
-                    continue
-                item_name = item_match.group(1).lower();
+            items = ItemHistoryScraper(dkp_file_content).parse()
+            for item in items:
+                item_name = item['name']
+                loot_date = item['loot_date']
                 if any(re.search(item_name, skippable_item, re.IGNORECASE) for skippable_item in self.config.skipped_loot):
                     continue;
                 total_loot += 1
-    
-                nextline = lines[lines.index(line) + 1]  # The date of looting is on the next line
-                if looted_date_match := self.looted_date_line.match(nextline):
-                    looted_date = looted_date_match.group(1)
-    
                 matched_spell = any(re.search(item_name, skippable_spell, re.IGNORECASE) for skippable_spell in self.config.spell_tokens)
                 if matched_spell:  # Check case-insensitive match of item name on known spell tokens
                     spellcount += 1
-                    if looted_date > days_ago_60:
+                    if loot_date > days_ago_60:
                         spellcount_sixty += 1
                 else:
                     gearcount += 1
-                    if looted_date > days_ago_60:
+                    if loot_date > days_ago_60:
                         gearcount_sixty += 1
     
-                    if looted_date > latest_gear_date:
-                        latest_gear_date = looted_date
+                    if loot_date > latest_gear_date:
+                        latest_gear_date = loot_date
     
             attend_sixty = self.chars[charid]['attend_sixty']
             if attend_sixty >= 75:
@@ -310,4 +334,3 @@ class Scraper:
 config = Config('config.txt', 'alternates.txt', 'spell_tokens.txt', 'skipped_loot.txt')
 scraper = Scraper(config)
 scraper.run()
-
