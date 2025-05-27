@@ -200,10 +200,8 @@ class Scraper:
         response = self.session.get(dkp_url)
         if not response.ok:
             raise Exception(f"Failed to download DKP for character {charid}, error code: {response.status_code}")
-        # Place every line containing an anchor tag on a new line as the html parser goes line by line.
-        split_html = response.text.replace("<a", "\n<a")
         with open("dkp.html", "w") as dkp_file:
-            dkp_file.write(split_html)
+            dkp_file.write(response.text)
         with open("dkp.html", "r") as dkp_file:
             return dkp_file.read()
 
