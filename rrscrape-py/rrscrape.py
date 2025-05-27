@@ -260,13 +260,13 @@ class Scraper:
     
             attend_sixty = self.chars[charid]["attend_sixty"]
             if attend_sixty >= 75:
-                attend_bracket_sixty = "1 (Excellent)"
+                attend_sixty_bracket = "1 (Excellent)"
             elif attend_sixty >= 50:
-                attend_bracket_sixty = "2 (Solid)"
+                attend_sixty_bracket = "2 (Solid)"
             elif attend_sixty >= 25:
-                attend_bracket_sixty = "3 (Patchy)"
+                attend_sixty_bracket = "3 (Patchy)"
             else:
-                attend_bracket_sixty = "4 (Low)"
+                attend_sixty_bracket = "4 (Low)"
     
             if gearcount == 0:
                 latest_gear_date = "N/A"
@@ -289,7 +289,7 @@ class Scraper:
                 "gearcount_sixty": gearcount_sixty,
                 "total_loot": total_loot,
                 "latest_gear_date": latest_gear_date,
-                "attend_bracket_sixty": attend_bracket_sixty,
+                "attend_sixty_bracket": attend_sixty_bracket,
                 "latest_gear_bracket": latest_gear_bracket,
                 "gear_attend_sixty_ratio": gear_attend_sixty_ratio,
                 "gear_dkp_alltime_ratio": gear_dkp_alltime_ratio,
@@ -321,7 +321,7 @@ class Scraper:
                         "{},{},{},{},{},{},{},{},{}\n".format(
                             char["name"],
                             char["dkp"],
-                            char["attend_bracket_sixty"],
+                            char["attend_sixty_bracket"],
                             gear_attend_60d_map[charid],
                             gear_dkp_alltime_map[charid],
                             spell_attend_60d_map[charid],
