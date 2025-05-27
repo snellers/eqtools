@@ -64,7 +64,8 @@ class GuildMembersScraper:
         form = self.soup.find("form", attrs = {"action": "", "method": "post"})
         chars = {}
         if form is None:
-            print("A HTML form containing the guild characters could not be found.\nThere was either a problem loading the page or the page layout has changed.")
+            print("A HTML form containing the guild characters could not be found.\n"
+                  + "There was either a problem loading the page or the page layout has changed.")
             return chars
         for row_tag in form.find_all("tr"):
             compare_char_input = row_tag.find("input", attrs = {"name": "compare_char_id[]"})
@@ -104,7 +105,8 @@ class ItemHistoryScraper:
     def parse(self):
         loot = []
         if not (item_history_header := self.soup.find("h4", string = "Item History")):
-            print("Could not locate the Item History table in the Character DKP page.\nThere was either a problem loading the page or the page layout has changed.")
+            print("Could not locate the Item History table in the Character DKP page.\n"
+                  + "There was either a problem loading the page or the page layout has changed.")
             return loot
         if not (loot_table := item_history_header.find_next_sibling("table", class_="forumline")):
             return loot
@@ -238,10 +240,12 @@ class Scraper:
             for item in items:
                 item_name = item["name"]
                 loot_date = item["loot_date"]
-                if any(re.search(item_name, skippable_item, re.IGNORECASE) for skippable_item in self.config.skipped_loot):
+                if any(re.search(item_name, skippable_item, re.IGNORECASE)
+                       for skippable_item in self.config.skipped_loot):
                     continue;
                 total_loot += 1
-                matched_spell = any(re.search(item_name, skippable_spell, re.IGNORECASE) for skippable_spell in self.config.spell_tokens)
+                matched_spell = any(re.search(item_name, skippable_spell, re.IGNORECASE)
+                                    for skippable_spell in self.config.spell_tokens)
                 if matched_spell:  # Check case-insensitive match of item name on known spell tokens
                     spellcount += 1
                     if loot_date > days_ago_60:
@@ -305,8 +309,13 @@ class Scraper:
         gear_attend_60d_map, gear_dkp_alltime_map, spell_attend_60d_map = self.calculate_dkp_rankings()
         print("Generating a new summary.csv") 
         with open("summary.csv", "w") as summary_file:
-            summary_file.write(f"Generated at {time.ctime()}.\n[ Gear: Non-spell loot ] [ Rank Columns: Higher = Better Off ] [ Attendance: Excellent = 75%+ | Solid = 50%+ | Patchy = 25%+ | Low = Under 25%. ]\n")
-            summary_file.write("Name,DKP,Attend (Last 60),Gear/Attend Rank (Last 60),Gear/DKP Rank (All Time),Spells/Attend Rank (Last 60),Last Gear Looted,Gear Total (Last 60),Gear Total (All Time)\n")
+            summary_file.write(
+                f"Generated at {time.ctime()}.\n"
+                + "[ Gear: Non-spell loot ] [ Rank Columns: Higher = Better Off ] "
+                + "[ Attendance: Excellent = 75%+ | Solid = 50%+ | Patchy = 25%+ | Low = Under 25%. ]\n")
+            summary_file.write(
+                "Name,DKP,Attend (Last 60),Gear/Attend Rank (Last 60),Gear/DKP Rank (All Time),"
+                + "Spells/Attend Rank (Last 60),Last Gear Looted,Gear Total (Last 60),Gear Total (All Time)\n")
             for charid, char in self.chars.items():
                 summary_file.write(
                         "{},{},{},{},{},{},{},{},{}\n".format(
@@ -321,6 +330,7 @@ class Scraper:
                             char["gearcount"]))
 
 
-config = Config("config.txt", "alternates.txt", "spell_tokens.txt", "skipped_loot.txt")
+config = Config("config.txt", "alternates.txt",
+                "spell_tokens.txt", "skipped_loot.txt")
 scraper = Scraper(config)
 scraper.run()
