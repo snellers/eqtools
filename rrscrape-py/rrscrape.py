@@ -250,15 +250,7 @@ class Scraper:
                         latest_gear_date = loot_date
     
             attend_60_day = chars[charid]["attend_60_day"]
-            if attend_60_day >= 75:
-                attend_60_day_bracket = "1 (Excellent)"
-            elif attend_60_day >= 50:
-                attend_60_day_bracket = "2 (Solid)"
-            elif attend_60_day >= 25:
-                attend_60_day_bracket = "3 (Patchy)"
-            else:
-                attend_60_day_bracket = "4 (Low)"
-    
+            attend_60_day_bracket = self.to_attend_60_day_bracket(attend_60_day)
             if gearcount == 0:
                 latest_gear_date = "N/A"
                 latest_gear_bracket = "5"
@@ -286,6 +278,17 @@ class Scraper:
                 "gear_dkp_alltime_ratio": gear_dkp_alltime_ratio,
                 "spells_attend_60_day_ratio": spells_attend_60_day_ratio
             })
+
+    # Converts a 60 day attendance percentage into a bracket label.
+    def to_attend_60_day_bracket(self, attend_60_day):
+        if attend_60_day >= 75:
+            return "1 (Excellent)"
+        elif attend_60_day >= 50:
+            return "2 (Solid)"
+        elif attend_60_day >= 25:
+            return "3 (Patchy)"
+        else:
+            return "4 (Low)"
 
     def calculate_dkp_rankings(self, chars):
         gear_attend_60d_rank = sorted(chars.keys(), key = lambda x: chars[x]["gear_attend_60_day_ratio"])
