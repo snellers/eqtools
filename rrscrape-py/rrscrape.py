@@ -82,7 +82,7 @@ class GuildMembersScraper:
                     "id": char_id,
                     "name": charname,
                     "dkp": dkp_earned,
-                    "attend_sixty": dkp_60_day_attended
+                    "attend_60_day": dkp_60_day_attended
             }
             if 0 < self.char_limit <= len(chars):
                 break
@@ -219,9 +219,9 @@ class Scraper:
         days_ago_60, days_ago_30, days_ago_15, days_ago_7 = self.get_recent_dates()
         for charid in chars.keys():
             spellcount = 0
-            spellcount_sixty = 0
+            spellcount_60_day = 0
             gearcount = 0
-            gearcount_sixty = 0
+            gearcount_60_day = 0
             total_loot = 0
             latest_gear_date = "1900-01-01"
             time.sleep(1) # wait between downloads so we don"t flood the server
@@ -233,31 +233,31 @@ class Scraper:
                 loot_date = item["loot_date"]
                 if any(re.search(item_name, skippable_item, re.IGNORECASE)
                        for skippable_item in self.config.skipped_loot):
-                    continue;
+                    continue
                 total_loot += 1
                 matched_spell = any(re.search(item_name, skippable_spell, re.IGNORECASE)
                                     for skippable_spell in self.config.spell_tokens)
                 if matched_spell:  # Check case-insensitive match of item name on known spell tokens
                     spellcount += 1
                     if loot_date > days_ago_60:
-                        spellcount_sixty += 1
+                        spellcount_60_day += 1
                 else:
                     gearcount += 1
                     if loot_date > days_ago_60:
-                        gearcount_sixty += 1
+                        gearcount_60_day += 1
     
                     if loot_date > latest_gear_date:
                         latest_gear_date = loot_date
     
-            attend_sixty = chars[charid]["attend_sixty"]
-            if attend_sixty >= 75:
-                attend_sixty_bracket = "1 (Excellent)"
-            elif attend_sixty >= 50:
-                attend_sixty_bracket = "2 (Solid)"
-            elif attend_sixty >= 25:
-                attend_sixty_bracket = "3 (Patchy)"
+            attend_60_day = chars[charid]["attend_60_day"]
+            if attend_60_day >= 75:
+                attend_60_day_bracket = "1 (Excellent)"
+            elif attend_60_day >= 50:
+                attend_60_day_bracket = "2 (Solid)"
+            elif attend_60_day >= 25:
+                attend_60_day_bracket = "3 (Patchy)"
             else:
-                attend_sixty_bracket = "4 (Low)"
+                attend_60_day_bracket = "4 (Low)"
     
             if gearcount == 0:
                 latest_gear_date = "N/A"
@@ -270,31 +270,31 @@ class Scraper:
                 latest_gear_bracket = "2"
             else:  # Most recent gear within last week
                 latest_gear_bracket = "1"
-            gear_attend_sixty_ratio = (gearcount_sixty / attend_sixty) * 100
+            gear_attend_60_day_ratio = (gearcount_60_day / attend_60_day) * 100
             gear_dkp_alltime_ratio = (gearcount / chars[charid]["dkp"]) * 100
-            spells_attend_sixty_ratio = (spellcount_sixty / attend_sixty) * 100
+            spells_attend_60_day_ratio = (spellcount_60_day / attend_60_day) * 100
             chars[charid].update({
                 "spellcount": spellcount,
-                "spellcount_sixty": spellcount_sixty,
+                "spellcount_60_day": spellcount_60_day,
                 "gearcount": gearcount,
-                "gearcount_sixty": gearcount_sixty,
+                "gearcount_60_day": gearcount_60_day,
                 "total_loot": total_loot,
                 "latest_gear_date": latest_gear_date,
-                "attend_sixty_bracket": attend_sixty_bracket,
+                "attend_60_day_bracket": attend_60_day_bracket,
                 "latest_gear_bracket": latest_gear_bracket,
-                "gear_attend_sixty_ratio": gear_attend_sixty_ratio,
+                "gear_attend_60_day_ratio": gear_attend_60_day_ratio,
                 "gear_dkp_alltime_ratio": gear_dkp_alltime_ratio,
-                "spells_attend_sixty_ratio": spells_attend_sixty_ratio
+                "spells_attend_60_day_ratio": spells_attend_60_day_ratio
             })
 
     def calculate_dkp_rankings(self, chars):
-        gear_attend_60d_rank = sorted(chars.keys(), key=lambda x: chars[x]["gear_attend_sixty_ratio"])
-        gear_dkp_alltime_rank = sorted(chars.keys(), key=lambda x: chars[x]["gear_dkp_alltime_ratio"])
-        spell_attend_60d_rank = sorted(chars.keys(), key=lambda x: chars[x]["spells_attend_sixty_ratio"])
+        gear_attend_60d_rank = sorted(chars.keys(), key = lambda x: chars[x]["gear_attend_60_day_ratio"])
+        gear_dkp_alltime_rank = sorted(chars.keys(), key = lambda x: chars[x]["gear_dkp_alltime_ratio"])
+        spell_attend_60d_rank = sorted(chars.keys(), key = lambda x: chars[x]["spells_attend_60_day_ratio"])
         gear_attend_60d_map = {key: rank for rank, key in enumerate(gear_attend_60d_rank)}
         gear_dkp_alltime_map = {key: rank for rank, key in enumerate(gear_dkp_alltime_rank)}
         spell_attend_60d_map = {key: rank for rank, key in enumerate(spell_attend_60d_rank)}
-        return (gear_attend_60d_map, gear_dkp_alltime_map, spell_attend_60d_map)
+        return gear_attend_60d_map, gear_dkp_alltime_map, spell_attend_60d_map
     
     def save_summary_report(self, chars):
         gear_attend_60d_map, gear_dkp_alltime_map, spell_attend_60d_map = self.calculate_dkp_rankings(chars)
@@ -312,12 +312,12 @@ class Scraper:
                         "{},{},{},{},{},{},{},{},{}\n".format(
                             char["name"],
                             char["dkp"],
-                            char["attend_sixty_bracket"],
+                            char["attend_60_day_bracket"],
                             gear_attend_60d_map[charid],
                             gear_dkp_alltime_map[charid],
                             spell_attend_60d_map[charid],
                             char["latest_gear_bracket"],
-                            char["gearcount_sixty"],
+                            char["gearcount_60_day"],
                             char["gearcount"]))
 
 
