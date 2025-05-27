@@ -3,6 +3,8 @@ import re
 import sys
 import time
 from datetime import datetime, timedelta
+from typing import Dict
+
 import requests
 from bs4 import BeautifulSoup
 
@@ -81,7 +83,7 @@ class GuildMembersScraper:
             chars[char_id] = {
                     "id": char_id,
                     "name": charname,
-                    "dkp": dkp_earned,
+                    "dkp_earned": dkp_earned,
                     "attend_60_day": dkp_60_day_attended
             }
             if 0 < self.char_limit <= len(chars):
@@ -115,6 +117,83 @@ class ItemHistoryScraper:
             loot_date = loot_date_td.text.strip()
             loot.append({"name": item_name, "loot_date": loot_date})
         return loot
+
+
+class RecentDates:
+
+    def __init__(self):
+        self.days_ago_60, self.days_ago_30, self.days_ago_15, self.days_ago_7 = [
+            self.format_date(self.days_in_seconds(d)) for d in [60, 30, 15, 7]
+        ]
+
+    def format_date(self, seconds_ago: int):
+        past_time = datetime.now() - timedelta(seconds = seconds_ago)
+        return past_time.strftime("%Y-%m-%d")
+
+    def days_in_seconds(self, days_ago: int):
+        return days_ago * 24 * 60 * 60
+
+
+# Calculates DKP stats for an individual character based on their recent loot.
+class DkpStats:
+
+    def __init__(self, config: Config, recent_dates: RecentDates, char_items: Dict, char_attend_60_day, char_dkp):
+        self.gearcount = 0
+        self.gearcount_60_day = 0
+        spellcount = 0
+        spellcount_60_day = 0
+        latest_gear_date = "1900-01-01"
+        for item in char_items:
+            item_name = item["name"]
+            loot_date = item["loot_date"]
+            if any(re.search(item_name, skippable_item, re.IGNORECASE)
+                   for skippable_item in config.skipped_loot):
+                continue
+            matched_spell = any(re.search(item_name, skippable_spell, re.IGNORECASE)
+                                for skippable_spell in config.spell_tokens)
+            if matched_spell:  # Check case-insensitive match of item name on known spell tokens
+                spellcount += 1
+                if loot_date > recent_dates.days_ago_60:
+                    spellcount_60_day += 1
+            else:
+                self.gearcount += 1
+                if loot_date > recent_dates.days_ago_60:
+                    self.gearcount_60_day += 1
+
+                if loot_date > latest_gear_date:
+                    latest_gear_date = loot_date
+
+        self.attend_60_day_bracket = self.to_attend_60_day_bracket(char_attend_60_day)
+        if self.gearcount == 0:
+            latest_gear_date = "N/A"
+        self.latest_gear_bracket = self.to_latest_gear_bracket(
+            self.gearcount, latest_gear_date, recent_dates)
+        self.gear_attend_60_day_ratio = (self.gearcount_60_day / char_attend_60_day) * 100
+        self.gear_dkp_alltime_ratio = (self.gearcount / char_dkp) * 100
+        self.spells_attend_60_day_ratio = (spellcount_60_day / char_attend_60_day) * 100
+
+    # Converts a 60 day attendance percentage into a bracket label.
+    def to_attend_60_day_bracket(self, char_attend_60_day):
+        if char_attend_60_day >= 75:
+            return "1 (Excellent)"
+        elif char_attend_60_day >= 50:
+            return "2 (Solid)"
+        elif char_attend_60_day >= 25:
+            return "3 (Patchy)"
+        else:
+            return "4 (Low)"
+
+    def to_latest_gear_bracket(self, gearcount: int, latest_gear_date, recent_dates: RecentDates):
+        if gearcount == 0:
+            return "5"
+        elif latest_gear_date < recent_dates.days_ago_30:
+            return "4"
+        elif latest_gear_date < recent_dates.days_ago_15:
+            return "3"
+        elif latest_gear_date < recent_dates.days_ago_7:
+            return "2"
+        else:  # Most recent gear within last week
+            return "1"
 
 
 class Scraper:
@@ -205,100 +284,25 @@ class Scraper:
         with open("dkp.html", "r") as dkp_file:
             return dkp_file.read()
 
-    def format_date(self, seconds_ago: int):
-        past_time = datetime.now() - timedelta(seconds = seconds_ago)
-        return past_time.strftime("%Y-%m-%d")
-
-    def days_in_seconds(self, days_ago: int):
-        return days_ago * 24 * 60 * 60
-
-    def get_recent_dates(self):
-        return [self.format_date(self.days_in_seconds(d)) for d in [60, 30, 15, 7]]
-
     def load_dkp_stats(self, chars):
-        days_ago_60, days_ago_30, days_ago_15, days_ago_7 = self.get_recent_dates()
+        recent_dates = RecentDates()
         for charid in chars.keys():
-            spellcount = 0
-            spellcount_60_day = 0
-            gearcount = 0
-            gearcount_60_day = 0
-            total_loot = 0
-            latest_gear_date = "1900-01-01"
             time.sleep(1) # wait between downloads so we don"t flood the server
             print("Processing: " + chars[charid]["name"])
             dkp_file_content = self.try_retrieve_char_dkp(charid)
-            items = ItemHistoryScraper(dkp_file_content).parse()
-            for item in items:
-                item_name = item["name"]
-                loot_date = item["loot_date"]
-                if any(re.search(item_name, skippable_item, re.IGNORECASE)
-                       for skippable_item in self.config.skipped_loot):
-                    continue
-                total_loot += 1
-                matched_spell = any(re.search(item_name, skippable_spell, re.IGNORECASE)
-                                    for skippable_spell in self.config.spell_tokens)
-                if matched_spell:  # Check case-insensitive match of item name on known spell tokens
-                    spellcount += 1
-                    if loot_date > days_ago_60:
-                        spellcount_60_day += 1
-                else:
-                    gearcount += 1
-                    if loot_date > days_ago_60:
-                        gearcount_60_day += 1
-    
-                    if loot_date > latest_gear_date:
-                        latest_gear_date = loot_date
-    
-            attend_60_day = chars[charid]["attend_60_day"]
-            attend_60_day_bracket = self.to_attend_60_day_bracket(attend_60_day)
-            if gearcount == 0:
-                latest_gear_date = "N/A"
-            latest_gear_bracket = self.to_latest_gear_bracket(
-                gearcount, latest_gear_date, days_ago_15, days_ago_30, days_ago_7)
-            gear_attend_60_day_ratio = (gearcount_60_day / attend_60_day) * 100
-            gear_dkp_alltime_ratio = (gearcount / chars[charid]["dkp"]) * 100
-            spells_attend_60_day_ratio = (spellcount_60_day / attend_60_day) * 100
-            chars[charid].update({
-                "spellcount": spellcount,
-                "spellcount_60_day": spellcount_60_day,
-                "gearcount": gearcount,
-                "gearcount_60_day": gearcount_60_day,
-                "total_loot": total_loot,
-                "latest_gear_date": latest_gear_date,
-                "attend_60_day_bracket": attend_60_day_bracket,
-                "latest_gear_bracket": latest_gear_bracket,
-                "gear_attend_60_day_ratio": gear_attend_60_day_ratio,
-                "gear_dkp_alltime_ratio": gear_dkp_alltime_ratio,
-                "spells_attend_60_day_ratio": spells_attend_60_day_ratio
-            })
-
-    # Converts a 60 day attendance percentage into a bracket label.
-    def to_attend_60_day_bracket(self, attend_60_day):
-        if attend_60_day >= 75:
-            return "1 (Excellent)"
-        elif attend_60_day >= 50:
-            return "2 (Solid)"
-        elif attend_60_day >= 25:
-            return "3 (Patchy)"
-        else:
-            return "4 (Low)"
-
-    def to_latest_gear_bracket(self, gearcount: int, latest_gear_date, days_ago_15, days_ago_30, days_ago_7):
-        if gearcount == 0:
-            return "5"
-        elif latest_gear_date < days_ago_30:
-            return "4"
-        elif latest_gear_date < days_ago_15:
-            return "3"
-        elif latest_gear_date < days_ago_7:
-            return "2"
-        else:  # Most recent gear within last week
-            return "1"
+            char_items = ItemHistoryScraper(dkp_file_content).parse()
+            dkp_stats = DkpStats(
+                config, recent_dates,
+                char_items,
+                chars[charid]["attend_60_day"],
+                chars[charid]["dkp_earned"]
+            )
+            chars[charid].update({"dkp_stats": dkp_stats})
 
     def calculate_dkp_rankings(self, chars):
-        gear_attend_60d_rank = sorted(chars.keys(), key = lambda x: chars[x]["gear_attend_60_day_ratio"])
-        gear_dkp_alltime_rank = sorted(chars.keys(), key = lambda x: chars[x]["gear_dkp_alltime_ratio"])
-        spell_attend_60d_rank = sorted(chars.keys(), key = lambda x: chars[x]["spells_attend_60_day_ratio"])
+        gear_attend_60d_rank = sorted(chars.keys(), key = lambda x: chars[x]["dkp_stats"].gear_attend_60_day_ratio)
+        gear_dkp_alltime_rank = sorted(chars.keys(), key = lambda x: chars[x]["dkp_stats"].gear_dkp_alltime_ratio)
+        spell_attend_60d_rank = sorted(chars.keys(), key = lambda x: chars[x]["dkp_stats"].spells_attend_60_day_ratio)
         gear_attend_60d_map = {key: rank for rank, key in enumerate(gear_attend_60d_rank)}
         gear_dkp_alltime_map = {key: rank for rank, key in enumerate(gear_dkp_alltime_rank)}
         spell_attend_60d_map = {key: rank for rank, key in enumerate(spell_attend_60d_rank)}
@@ -319,14 +323,14 @@ class Scraper:
                 summary_file.write(
                         "{},{},{},{},{},{},{},{},{}\n".format(
                             char["name"],
-                            char["dkp"],
-                            char["attend_60_day_bracket"],
+                            char["dkp_earned"],
+                            char["dkp_stats"].attend_60_day_bracket,
                             gear_attend_60d_map[charid],
                             gear_dkp_alltime_map[charid],
                             spell_attend_60d_map[charid],
-                            char["latest_gear_bracket"],
-                            char["gearcount_60_day"],
-                            char["gearcount"]))
+                            char["dkp_stats"].latest_gear_bracket,
+                            char["dkp_stats"].gearcount_60_day,
+                            char["dkp_stats"].gearcount))
 
 
 config = Config("config.txt", "alternates.txt",
