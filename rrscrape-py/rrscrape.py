@@ -1,14 +1,9 @@
 #!/usr/bin/env python3
-import os
 import re
-import time
 import sys
+import time
 from datetime import datetime, timedelta
-import http.cookies
-import http.cookiejar
-from urllib import request, parse
 import requests
-from typing import List, Dict
 from bs4 import BeautifulSoup
 
 class Config:
@@ -21,7 +16,7 @@ class Config:
     def load_guild_name(self, config_file):
         try:
             with open(config_file) as f:
-                name = f.read().strip().split(' ')[0].lower()
+                name = f.read().strip().split(" ")[0].lower()
                 if not name or "http" in name:
                     print(self.config_txt_advice())
                     sys.exit(1)
@@ -46,7 +41,7 @@ class Config:
 
     def load_list(self, filename):
         try:
-            with open(filename, 'r') as handle:
+            with open(filename, "r") as handle:
                 list_ = [line.strip() for line in handle if line.strip()]
             print(f"Loaded {len(list_)} entries from {filename}.")
             return list_
@@ -55,75 +50,75 @@ class Config:
             sys.exit(1)
 
 class GuildMembersScraper:
-    character_dkp_re = re.compile(r'character_dkp\.php')
-    dkp_earned_re = re.compile(r'dkp_earned')
-    dkp_attend_re = re.compile(r'dkp_[a-z]+_attend')
-    parens_pct_re = re.compile(r'[\(\)%]')
+    character_dkp_re = re.compile(r"character_dkp\.php")
+    dkp_earned_re = re.compile(r"dkp_earned")
+    dkp_attend_re = re.compile(r"dkp_[a-z]+_attend")
+    parens_pct_re = re.compile(r"[\(\)%]")
     def __init__(self, html, char_limit):
-        self.soup = BeautifulSoup(html, 'lxml')
+        self.soup = BeautifulSoup(html, "lxml")
         self.char_limit = char_limit
 
     def parse(self):
         def is_td_dkp_span(tag):
-            return tag.name == 'td' and tag.find('span', class_ = self.dkp_attend_re) is not None
-        form = self.soup.find('form', attrs = {'action': '', 'method': 'post'})
+            return tag.name == "td" and tag.find("span", class_ = self.dkp_attend_re) is not None
+        form = self.soup.find("form", attrs = {"action": "", "method": "post"})
         chars = {}
         if form is None:
             print("A HTML form containing the guild characters could not be found.\nThere was either a problem loading the page or the page layout has changed.")
             return chars
-        for row_tag in form.find_all('tr'):
-            compare_char_input = row_tag.find('input', attrs = {'name': 'compare_char_id[]'})
-            char_anchor = row_tag.find('a', href = self.character_dkp_re)
-            dkp_earned_span = row_tag.find('span', class_ = self.dkp_earned_re)
+        for row_tag in form.find_all("tr"):
+            compare_char_input = row_tag.find("input", attrs = {"name": "compare_char_id[]"})
+            char_anchor = row_tag.find("a", href = self.character_dkp_re)
+            dkp_earned_span = row_tag.find("span", class_ = self.dkp_earned_re)
             if compare_char_input is None or char_anchor is None or dkp_earned_span is None:
                 continue
-            if not (char_id := compare_char_input['value']):
+            if not (char_id := compare_char_input["value"]):
                 continue
             dkp_span_tds = row_tag.find_all(is_td_dkp_span)
             if dkp_span_tds is None:
                 continue
             # There are two DKP attendance ratio columns, the second one tracking 60 day attendance is needed.
-            dkp_60day_span = dkp_span_tds[1].find('span', class_ = self.dkp_attend_re)
+            dkp_60day_span = dkp_span_tds[1].find("span", class_ = self.dkp_attend_re)
             charname = char_anchor.text.strip()
-            dkp_earned = float(dkp_earned_span.text.strip().replace(',', ''))
-            dkp_60_day_attended = int(re.sub(self.parens_pct_re, '', dkp_60day_span.text.strip()))
+            dkp_earned = float(dkp_earned_span.text.strip().replace(",", ""))
+            dkp_60_day_attended = int(re.sub(self.parens_pct_re, "", dkp_60day_span.text.strip()))
             # Skip characters who are inactive raiders
             if dkp_earned == 0 or dkp_60_day_attended == 0:
                 continue
             chars[char_id] = {
-                    'id': char_id,
-                    'name': charname,
-                    'dkp': dkp_earned,
-                    'attend_sixty': dkp_60_day_attended
+                    "id": char_id,
+                    "name": charname,
+                    "dkp": dkp_earned,
+                    "attend_sixty": dkp_60_day_attended
             }
             if 0 < self.char_limit <= len(chars):
                 break
         return chars
 
 class ItemHistoryScraper:
-    item_name_re = re.compile(r'\[.*\]')
-    loot_date_re = re.compile(r'(\d{4}-\d{2}-\d{2})')
+    item_name_re = re.compile(r"\[.*\]")
+    loot_date_re = re.compile(r"(\d{4}-\d{2}-\d{2})")
     def __init__(self, html):
-        self.soup = BeautifulSoup(html, 'lxml')
+        self.soup = BeautifulSoup(html, "lxml")
 
     def parse(self):
         loot = []
-        if not (item_history_header := self.soup.find('h4', string = 'Item History')):
+        if not (item_history_header := self.soup.find("h4", string = "Item History")):
             print("Could not locate the Item History table in the Character DKP page.\nThere was either a problem loading the page or the page layout has changed.")
             return loot
-        if not (loot_table := item_history_header.find_next_sibling('table', class_="forumline")):
+        if not (loot_table := item_history_header.find_next_sibling("table", class_="forumline")):
             return loot
-        for row_tag in loot_table.find_all('tr'):
+        for row_tag in loot_table.find_all("tr"):
             # The item names sit within an anchor tag, and are surrounded by square brackets. However, the page is quite
             # complicated, with some items being nested within a span. There are at least three variations. Fortunately
             # extracting the anchor text suffices.
-            if not (item_anchor := row_tag.find('a', string=re.compile(self.item_name_re))):
+            if not (item_anchor := row_tag.find("a", string=re.compile(self.item_name_re))):
                 continue
-            item_name = item_anchor.text.strip().replace('[', '').replace(']', '')
-            if not (loot_date_td := row_tag.find('td', string=re.compile(self.loot_date_re))):
+            item_name = item_anchor.text.strip().replace("[", "").replace("]", "")
+            if not (loot_date_td := row_tag.find("td", string=re.compile(self.loot_date_re))):
                 continue
             loot_date = loot_date_td.text.strip()
-            loot.append({'name': item_name, 'loot_date': loot_date})
+            loot.append({"name": item_name, "loot_date": loot_date})
         return loot
 
 
@@ -142,7 +137,7 @@ class Scraper:
         self.save_summary_report()
 
     def prompt(self, msg: str):
-        print(msg, end='')
+        print(msg, end="")
         try:
             f = input()
             return f
@@ -177,11 +172,11 @@ class Scraper:
             print("\nDo you want to do a full scrape of every active member?\n"
                   "If not, the program will run in test mode and scrape 3 characters before stopping.")
             scrape_mode = self.prompt("Full scrape y/n?: ")
-            if scrape_mode.lower() == 'n':
+            if scrape_mode.lower() == "n":
                 print("Ok, running in test mode.")
                 self.char_limit = 3
                 break
-            elif scrape_mode.lower() == 'y':
+            elif scrape_mode.lower() == "y":
                 print("Initiating full scrape, please wait.")
                 break
         
@@ -191,13 +186,13 @@ class Scraper:
         members_response = self.session.get(members_url)
         if not members_response.ok:
             raise Exception(f"Failed to download members list, error code: {members_response.status_code}")
-        with open("members.html", 'w', encoding='utf-8') as member_fh:
+        with open("members.html", "w", encoding="utf-8") as member_fh:
             member_fh.write(members_response.text)
         if "Members for the" not in members_response.text:
             raise Exception("Didn't find expected content in the members page.")
 
     def build_char_map(self):
-        with open("members.html", 'r', encoding='utf-8') as file:
+        with open("members.html", "r", encoding="utf-8") as file:
             html = file.read()
             self.chars = GuildMembersScraper(html, self.char_limit).parse()
         member_count = len(self.chars)
@@ -211,7 +206,7 @@ class Scraper:
         if not response.ok:
             raise Exception(f"Failed to download DKP for character {charid}, error code: {response.status_code}")
         # Place every line containing an anchor tag on a new line as the html parser goes line by line.
-        split_html = response.text.replace('<a', '\n<a')
+        split_html = response.text.replace("<a", "\n<a")
         with open("dkp.html", "w") as dkp_file:
             dkp_file.write(split_html)
         with open("dkp.html", "r") as dkp_file:
@@ -219,7 +214,7 @@ class Scraper:
 
     def format_date(self, seconds_ago: int):
         past_time = datetime.now() - timedelta(seconds=seconds_ago)
-        return past_time.strftime('%Y-%m-%d')
+        return past_time.strftime("%Y-%m-%d")
 
     def days_in_seconds(self, days_ago: int):
         return days_ago * 24 * 60 * 60
@@ -235,14 +230,14 @@ class Scraper:
             gearcount = 0
             gearcount_sixty = 0
             total_loot = 0
-            latest_gear_date = '1900-01-01'
-            time.sleep(1) # wait between downloads so we don't flood the server
-            print("Processing: " + self.chars[charid]['name'])
+            latest_gear_date = "1900-01-01"
+            time.sleep(1) # wait between downloads so we don"t flood the server
+            print("Processing: " + self.chars[charid]["name"])
             dkp_file_content = self.try_retrieve_char_dkp(charid)
             items = ItemHistoryScraper(dkp_file_content).parse()
             for item in items:
-                item_name = item['name']
-                loot_date = item['loot_date']
+                item_name = item["name"]
+                loot_date = item["loot_date"]
                 if any(re.search(item_name, skippable_item, re.IGNORECASE) for skippable_item in self.config.skipped_loot):
                     continue;
                 total_loot += 1
@@ -259,48 +254,48 @@ class Scraper:
                     if loot_date > latest_gear_date:
                         latest_gear_date = loot_date
     
-            attend_sixty = self.chars[charid]['attend_sixty']
+            attend_sixty = self.chars[charid]["attend_sixty"]
             if attend_sixty >= 75:
-                attend_bracket_sixty = '1 (Excellent)'
+                attend_bracket_sixty = "1 (Excellent)"
             elif attend_sixty >= 50:
-                attend_bracket_sixty = '2 (Solid)'
+                attend_bracket_sixty = "2 (Solid)"
             elif attend_sixty >= 25:
-                attend_bracket_sixty = '3 (Patchy)'
+                attend_bracket_sixty = "3 (Patchy)"
             else:
-                attend_bracket_sixty = '4 (Low)'
+                attend_bracket_sixty = "4 (Low)"
     
             if gearcount == 0:
-                latest_gear_date = 'N/A'
-                latest_gear_bracket = '5'
+                latest_gear_date = "N/A"
+                latest_gear_bracket = "5"
             elif latest_gear_date < days_ago_30:
-                latest_gear_bracket = '4'
+                latest_gear_bracket = "4"
             elif latest_gear_date < days_ago_15:
-                latest_gear_bracket = '3'
+                latest_gear_bracket = "3"
             elif latest_gear_date < days_ago_7:
-                latest_gear_bracket = '2'
+                latest_gear_bracket = "2"
             else:  # Most recent gear within last week
-                latest_gear_bracket = '1'
+                latest_gear_bracket = "1"
             gear_attend_sixty_ratio = (gearcount_sixty / attend_sixty) * 100
-            gear_dkp_alltime_ratio = (gearcount / self.chars[charid]['dkp']) * 100
+            gear_dkp_alltime_ratio = (gearcount / self.chars[charid]["dkp"]) * 100
             spells_attend_sixty_ratio = (spellcount_sixty / attend_sixty) * 100
             self.chars[charid].update({
-                'spellcount': spellcount,
-                'spellcount_sixty': spellcount_sixty,
-                'gearcount': gearcount,
-                'gearcount_sixty': gearcount_sixty,
-                'total_loot': total_loot,
-                'latest_gear_date': latest_gear_date,
-                'attend_bracket_sixty': attend_bracket_sixty,
-                'latest_gear_bracket': latest_gear_bracket,
-                'gear_attend_sixty_ratio': gear_attend_sixty_ratio,
-                'gear_dkp_alltime_ratio': gear_dkp_alltime_ratio,
-                'spells_attend_sixty_ratio': spells_attend_sixty_ratio
+                "spellcount": spellcount,
+                "spellcount_sixty": spellcount_sixty,
+                "gearcount": gearcount,
+                "gearcount_sixty": gearcount_sixty,
+                "total_loot": total_loot,
+                "latest_gear_date": latest_gear_date,
+                "attend_bracket_sixty": attend_bracket_sixty,
+                "latest_gear_bracket": latest_gear_bracket,
+                "gear_attend_sixty_ratio": gear_attend_sixty_ratio,
+                "gear_dkp_alltime_ratio": gear_dkp_alltime_ratio,
+                "spells_attend_sixty_ratio": spells_attend_sixty_ratio
             })
 
     def calculate_dkp_rankings(self):
-        gear_attend_60d_rank = sorted(self.chars.keys(), key=lambda x: self.chars[x]['gear_attend_sixty_ratio'])
-        gear_dkp_alltime_rank = sorted(self.chars.keys(), key=lambda x: self.chars[x]['gear_dkp_alltime_ratio'])
-        spell_attend_60d_rank = sorted(self.chars.keys(), key=lambda x: self.chars[x]['spells_attend_sixty_ratio'])
+        gear_attend_60d_rank = sorted(self.chars.keys(), key=lambda x: self.chars[x]["gear_attend_sixty_ratio"])
+        gear_dkp_alltime_rank = sorted(self.chars.keys(), key=lambda x: self.chars[x]["gear_dkp_alltime_ratio"])
+        spell_attend_60d_rank = sorted(self.chars.keys(), key=lambda x: self.chars[x]["spells_attend_sixty_ratio"])
         gear_attend_60d_map = {key: rank for rank, key in enumerate(gear_attend_60d_rank)}
         gear_dkp_alltime_map = {key: rank for rank, key in enumerate(gear_dkp_alltime_rank)}
         spell_attend_60d_map = {key: rank for rank, key in enumerate(spell_attend_60d_rank)}
@@ -309,23 +304,23 @@ class Scraper:
     def save_summary_report(self):
         gear_attend_60d_map, gear_dkp_alltime_map, spell_attend_60d_map = self.calculate_dkp_rankings()
         print("Generating a new summary.csv") 
-        with open('summary.csv', 'w') as summary_file:
+        with open("summary.csv", "w") as summary_file:
             summary_file.write(f"Generated at {time.ctime()}.\n[ Gear: Non-spell loot ] [ Rank Columns: Higher = Better Off ] [ Attendance: Excellent = 75%+ | Solid = 50%+ | Patchy = 25%+ | Low = Under 25%. ]\n")
             summary_file.write("Name,DKP,Attend (Last 60),Gear/Attend Rank (Last 60),Gear/DKP Rank (All Time),Spells/Attend Rank (Last 60),Last Gear Looted,Gear Total (Last 60),Gear Total (All Time)\n")
             for charid, char in self.chars.items():
                 summary_file.write(
                         "{},{},{},{},{},{},{},{},{}\n".format(
-                            char['name'],
-                            char['dkp'],
-                            char['attend_bracket_sixty'],
+                            char["name"],
+                            char["dkp"],
+                            char["attend_bracket_sixty"],
                             gear_attend_60d_map[charid],
                             gear_dkp_alltime_map[charid],
                             spell_attend_60d_map[charid],
-                            char['latest_gear_bracket'],
-                            char['gearcount_sixty'],
-                            char['gearcount']))
+                            char["latest_gear_bracket"],
+                            char["gearcount_sixty"],
+                            char["gearcount"]))
 
 
-config = Config('config.txt', 'alternates.txt', 'spell_tokens.txt', 'skipped_loot.txt')
+config = Config("config.txt", "alternates.txt", "spell_tokens.txt", "skipped_loot.txt")
 scraper = Scraper(config)
 scraper.run()
