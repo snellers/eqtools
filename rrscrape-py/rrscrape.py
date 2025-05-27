@@ -253,15 +253,8 @@ class Scraper:
             attend_60_day_bracket = self.to_attend_60_day_bracket(attend_60_day)
             if gearcount == 0:
                 latest_gear_date = "N/A"
-                latest_gear_bracket = "5"
-            elif latest_gear_date < days_ago_30:
-                latest_gear_bracket = "4"
-            elif latest_gear_date < days_ago_15:
-                latest_gear_bracket = "3"
-            elif latest_gear_date < days_ago_7:
-                latest_gear_bracket = "2"
-            else:  # Most recent gear within last week
-                latest_gear_bracket = "1"
+            latest_gear_bracket = self.to_latest_gear_bracket(
+                gearcount, latest_gear_date, days_ago_15, days_ago_30, days_ago_7)
             gear_attend_60_day_ratio = (gearcount_60_day / attend_60_day) * 100
             gear_dkp_alltime_ratio = (gearcount / chars[charid]["dkp"]) * 100
             spells_attend_60_day_ratio = (spellcount_60_day / attend_60_day) * 100
@@ -289,6 +282,18 @@ class Scraper:
             return "3 (Patchy)"
         else:
             return "4 (Low)"
+
+    def to_latest_gear_bracket(self, gearcount: int, latest_gear_date, days_ago_15, days_ago_30, days_ago_7):
+        if gearcount == 0:
+            return "5"
+        elif latest_gear_date < days_ago_30:
+            return "4"
+        elif latest_gear_date < days_ago_15:
+            return "3"
+        elif latest_gear_date < days_ago_7:
+            return "2"
+        else:  # Most recent gear within last week
+            return "1"
 
     def calculate_dkp_rankings(self, chars):
         gear_attend_60d_rank = sorted(chars.keys(), key = lambda x: chars[x]["gear_attend_60_day_ratio"])
