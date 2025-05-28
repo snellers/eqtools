@@ -332,8 +332,8 @@ class Scraper:
                             char["dkp_stats"].gearcount_60_day,
                             char["dkp_stats"].gearcount))
 
-
-config = Config("config.txt", "alternates.txt",
-                "spell_tokens.txt", "skipped_loot.txt")
-scraper = Scraper(config)
-scraper.run()
+if __name__ == "__main__":
+    config = Config("config.txt", "alternates.txt",
+                    "spell_tokens.txt", "skipped_loot.txt")
+    scraper = Scraper(config)
+    scraper.run()
