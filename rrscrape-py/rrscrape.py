@@ -280,11 +280,11 @@ class Scraper:
                 raise Exception("At least one guild member should've been found. Something went wrong, try again later.")
             return chars
 
-    def try_retrieve_char_dkp(self, charid: str) -> str:
-        dkp_url: str = f"{self.base_url}/users/characters/character_dkp.php?char={charid}"
+    def try_retrieve_char_dkp(self, char_id: str) -> str:
+        dkp_url: str = f"{self.base_url}/users/characters/character_dkp.php?char={char_id}"
         response: Response = self.session.get(dkp_url)
         if not response.ok:
-            raise Exception(f"Failed to download DKP for character {charid}, error code: {response.status_code}")
+            raise Exception(f"Failed to download DKP for character {char_id}, error code: {response.status_code}")
         with open("dkp.html", "w") as dkp_file:
             dkp_file.write(response.text)
         with open("dkp.html", "r") as dkp_file:
@@ -292,16 +292,16 @@ class Scraper:
 
     def load_dkp_stats(self, chars: Dict[str, Character]) -> None:
         recent_dates = RecentDates()
-        for charid in chars.keys():
+        for char_id in chars.keys():
             time.sleep(1) # wait between downloads so we don"t flood the server
-            print("Processing: " + chars[charid].name)
-            dkp_file_content: str = self.try_retrieve_char_dkp(charid)
+            print("Processing: " + chars[char_id].name)
+            dkp_file_content: str = self.try_retrieve_char_dkp(char_id)
             char_items: Dict[str, str] = ItemHistoryScraper(dkp_file_content).parse()
-            chars[charid].dkp_stats = DkpStats(
+            chars[char_id].dkp_stats = DkpStats(
                 config, recent_dates,
                 char_items,
-                chars[charid].attend_60_day,
-                chars[charid].dkp_earned
+                chars[char_id].attend_60_day,
+                chars[char_id].dkp_earned
             )
 
     # Returns a list of Dicts that map character ids to the character's ordinal rank in 3 different categories.
@@ -325,15 +325,15 @@ class Scraper:
             summary_file.write(
                 "Name,DKP,Attend (Last 60),Gear/Attend Rank (Last 60),Gear/DKP Rank (All Time),"
                 + "Spells/Attend Rank (Last 60),Last Gear Looted,Gear Total (Last 60),Gear Total (All Time)\n")
-            for charid, char in chars.items():
+            for char_id, char in chars.items():
                 summary_file.write(
                         "{},{},{},{},{},{},{},{},{}\n".format(
                             char.name,
                             char.dkp_earned,
                             char.dkp_stats.attend_60_day_bracket,
-                            gear_attend_60d_map[charid],
-                            gear_dkp_alltime_map[charid],
-                            spell_attend_60d_map[charid],
+                            gear_attend_60d_map[char_id],
+                            gear_dkp_alltime_map[char_id],
+                            spell_attend_60d_map[char_id],
                             char.dkp_stats.latest_gear_bracket,
                             char.dkp_stats.gearcount_60_day,
                             char.dkp_stats.gearcount))
