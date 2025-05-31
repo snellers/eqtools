@@ -9,7 +9,6 @@ import requests
 from bs4 import BeautifulSoup
 from requests import Response
 
-
 class Config:
 
     def __init__(self, config_file: str, alternates_file: str, spell_tokens_file: str, skipped_loot_file: str):
@@ -44,85 +43,6 @@ class Config:
             print(f"File not found: {filename}")
             sys.exit(1)
 
-class GuildMembersScraper:
-    character_dkp_re: re.Pattern[str] = re.compile(r"character_dkp\.php")
-    dkp_earned_re:  re.Pattern[str] = re.compile(r"dkp_earned")
-    dkp_attend_re:  re.Pattern[str] = re.compile(r"dkp_[a-z]+_attend")
-    parens_pct_re:  re.Pattern[str] = re.compile(r"[\(\)%]")
-
-    def __init__(self, html: str, char_limit: int):
-        self.soup = BeautifulSoup(html, "lxml")
-        self.char_limit = char_limit
-
-    def parse(self) -> Dict[str, Dict]:
-
-        def is_td_dkp_span(tag) -> bool:
-            return tag.name == "td" and tag.find("span", class_ = self.dkp_attend_re) is not None
-
-        form = self.soup.find("form", attrs = {"action": "", "method": "post"})
-        chars: Dict[str, Dict] = {}
-        if form is None:
-            print("A HTML form containing the guild characters could not be found.\n"
-                  + "There was either a problem loading the page or the page layout has changed.")
-            return chars
-        for row_tag in form.find_all("tr"):
-            compare_char_input = row_tag.find("input", attrs = {"name": "compare_char_id[]"})
-            char_anchor = row_tag.find("a", href = self.character_dkp_re)
-            dkp_earned_span = row_tag.find("span", class_ = self.dkp_earned_re)
-            if compare_char_input is None or char_anchor is None or dkp_earned_span is None:
-                continue
-            if not (char_id := compare_char_input["value"]):
-                continue
-            dkp_span_tds = row_tag.find_all(is_td_dkp_span)
-            if dkp_span_tds is None:
-                continue
-            # There are two DKP attendance ratio columns, the second one tracking 60 day attendance is needed.
-            dkp_60day_span = dkp_span_tds[1].find("span", class_ = self.dkp_attend_re)
-            charname: str = char_anchor.text.strip()
-            dkp_earned: float = float(dkp_earned_span.text.strip().replace(",", ""))
-            dkp_60_day_attended: int = int(re.sub(self.parens_pct_re, "", dkp_60day_span.text.strip()))
-            # Skip characters who are inactive raiders
-            if dkp_earned == 0 or dkp_60_day_attended == 0:
-                continue
-            chars[char_id] = {
-                    "id": char_id,
-                    "name": charname,
-                    "dkp_earned": dkp_earned,
-                    "attend_60_day": dkp_60_day_attended
-            }
-            if 0 < self.char_limit <= len(chars):
-                break
-        return chars
-
-class ItemHistoryScraper:
-    item_name_re: re.Pattern[str] = re.compile(r"\[.*\]")
-    loot_date_re: re.Pattern[str] = re.compile(r"(\d{4}-\d{2}-\d{2})")
-
-    def __init__(self, html):
-        self.soup = BeautifulSoup(html, "lxml")
-
-    def parse(self) -> Dict[str, str]:
-        loot: Dict[str, str] = []
-        if not (item_history_header := self.soup.find("h4", string = "Item History")):
-            print("Could not locate the Item History table in the Character DKP page.\n"
-                  + "There was either a problem loading the page or the page layout has changed.")
-            return loot
-        if not (loot_table := item_history_header.find_next_sibling("table", class_="forumline")):
-            return loot
-        for row_tag in loot_table.find_all("tr"):
-            # The item names sit within an anchor tag, and are surrounded by square brackets. However, the page is quite
-            # complicated, with some items being nested within a span. There are at least three variations. Fortunately
-            # extracting the anchor text suffices.
-            if not (item_anchor := row_tag.find("a", string=re.compile(self.item_name_re))):
-                continue
-            item_name: str = item_anchor.text.strip().replace("[", "").replace("]", "")
-            if not (loot_date_td := row_tag.find("td", string=re.compile(self.loot_date_re))):
-                continue
-            loot_date: str = loot_date_td.text.strip()
-            loot.append({"name": item_name, "loot_date": loot_date})
-        return loot
-
-
 class RecentDates:
 
     def __init__(self):
@@ -138,7 +58,7 @@ class RecentDates:
         return days_ago * 24 * 60 * 60
 
 
-# Calculates DKP stats for an individual character based on their recent loot.
+# Calculates DKP stats for an individual Character based on their recent loot.
 class DkpStats:
 
     def __init__(self, config: Config, recent_dates: RecentDates,
@@ -200,6 +120,88 @@ class DkpStats:
         else:  # Most recent gear within last week
             return "1"
 
+class Character:
+    def __init__(self, id, name, dkp_earned, attend_60_day):
+        self.id = id
+        self.name = name
+        self.dkp_earned = dkp_earned
+        self.attend_60_day = attend_60_day
+        self.dkp_stats = None # initialized later by load_dkp_stats()
+
+
+class GuildMembersScraper:
+    character_dkp_re: re.Pattern[str] = re.compile(r"character_dkp\.php")
+    dkp_earned_re:  re.Pattern[str] = re.compile(r"dkp_earned")
+    dkp_attend_re:  re.Pattern[str] = re.compile(r"dkp_[a-z]+_attend")
+    parens_pct_re:  re.Pattern[str] = re.compile(r"[\(\)%]")
+
+    def __init__(self, html: str, char_limit: int):
+        self.soup = BeautifulSoup(html, "lxml")
+        self.char_limit = char_limit
+
+    def parse(self) -> Dict[str, Character]:
+
+        def is_td_dkp_span(tag) -> bool:
+            return tag.name == "td" and tag.find("span", class_ = self.dkp_attend_re) is not None
+
+        form = self.soup.find("form", attrs = {"action": "", "method": "post"})
+        chars: Dict[str, Character] = {}
+        if form is None:
+            print("A HTML form containing the guild characters could not be found.\n"
+                  + "There was either a problem loading the page or the page layout has changed.")
+            return chars
+        for row_tag in form.find_all("tr"):
+            compare_char_input = row_tag.find("input", attrs = {"name": "compare_char_id[]"})
+            char_anchor = row_tag.find("a", href = self.character_dkp_re)
+            dkp_earned_span = row_tag.find("span", class_ = self.dkp_earned_re)
+            if compare_char_input is None or char_anchor is None or dkp_earned_span is None:
+                continue
+            if not (char_id := compare_char_input["value"]):
+                continue
+            dkp_span_tds = row_tag.find_all(is_td_dkp_span)
+            if dkp_span_tds is None:
+                continue
+            # There are two DKP attendance ratio columns, the second one tracking 60 day attendance is needed.
+            dkp_60day_span = dkp_span_tds[1].find("span", class_ = self.dkp_attend_re)
+            charname: str = char_anchor.text.strip()
+            dkp_earned: float = float(dkp_earned_span.text.strip().replace(",", ""))
+            dkp_60_day_attended: int = int(re.sub(self.parens_pct_re, "", dkp_60day_span.text.strip()))
+            # Skip characters who are inactive raiders
+            if dkp_earned == 0 or dkp_60_day_attended == 0:
+                continue
+            chars[char_id] = Character(char_id, charname, dkp_earned, dkp_60_day_attended);
+            if 0 < self.char_limit <= len(chars):
+                break
+        return chars
+
+class ItemHistoryScraper:
+    item_name_re: re.Pattern[str] = re.compile(r"\[.*\]")
+    loot_date_re: re.Pattern[str] = re.compile(r"(\d{4}-\d{2}-\d{2})")
+
+    def __init__(self, html):
+        self.soup = BeautifulSoup(html, "lxml")
+
+    def parse(self) -> Dict[str, str]:
+        loot: Dict[str, str] = []
+        if not (item_history_header := self.soup.find("h4", string = "Item History")):
+            print("Could not locate the Item History table in the Character DKP page.\n"
+                  + "There was either a problem loading the page or the page layout has changed.")
+            return loot
+        if not (loot_table := item_history_header.find_next_sibling("table", class_="forumline")):
+            return loot
+        for row_tag in loot_table.find_all("tr"):
+            # The item names sit within an anchor tag, and are surrounded by square brackets. However, the page is quite
+            # complicated, with some items being nested within a span. There are at least three variations. Fortunately
+            # extracting the anchor text suffices.
+            if not (item_anchor := row_tag.find("a", string=re.compile(self.item_name_re))):
+                continue
+            item_name: str = item_anchor.text.strip().replace("[", "").replace("]", "")
+            if not (loot_date_td := row_tag.find("td", string=re.compile(self.loot_date_re))):
+                continue
+            loot_date: str = loot_date_td.text.strip()
+            loot.append({"name": item_name, "loot_date": loot_date})
+        return loot
+
 
 class Scraper:
 
@@ -212,7 +214,7 @@ class Scraper:
         self.try_login()
         char_limit: int = self.select_char_limit()
         self.try_retrieve_members()
-        chars: Dict[str, Dict] = self.build_char_map(char_limit)
+        chars: Dict[str, Character] = self.build_char_map(char_limit)
         self.load_dkp_stats(chars)
         self.save_summary_report(chars)
 
@@ -268,10 +270,10 @@ class Scraper:
         if "Members for the" not in members_response.text:
             raise Exception("Didn't find expected content in the members page.")
 
-    def build_char_map(self, char_limit) -> Dict[str, Dict]:
+    def build_char_map(self, char_limit) -> Dict[str, Character]:
         with open("members.html", "r", encoding="utf-8") as file:
             html: str = file.read()
-            chars: Dict[str, Dict] = GuildMembersScraper(html, char_limit).parse()
+            chars: Dict[str, Character] = GuildMembersScraper(html, char_limit).parse()
             member_count = len(chars)
             print(f"Loaded {member_count} guild members.")
             if member_count == 0:
@@ -288,31 +290,31 @@ class Scraper:
         with open("dkp.html", "r") as dkp_file:
             return dkp_file.read()
 
-    def load_dkp_stats(self, chars: Dict[str, Dict]) -> None:
+    def load_dkp_stats(self, chars: Dict[str, Character]) -> None:
         recent_dates = RecentDates()
         for charid in chars.keys():
             time.sleep(1) # wait between downloads so we don"t flood the server
-            print("Processing: " + chars[charid]["name"])
+            print("Processing: " + chars[charid].name)
             dkp_file_content: str = self.try_retrieve_char_dkp(charid)
             char_items: Dict[str, str] = ItemHistoryScraper(dkp_file_content).parse()
-            dkp_stats: DkpStats = DkpStats(
+            chars[charid].dkp_stats = DkpStats(
                 config, recent_dates,
                 char_items,
-                chars[charid]["attend_60_day"],
-                chars[charid]["dkp_earned"]
+                chars[charid].attend_60_day,
+                chars[charid].dkp_earned
             )
-            chars[charid].update({"dkp_stats": dkp_stats})
 
-    def calculate_dkp_rankings(self, chars) -> List[Dict[str, int]]:
-        gear_attend_60d_rank: int = sorted(chars.keys(), key = lambda x: chars[x]["dkp_stats"].gear_attend_60_day_ratio)
-        gear_dkp_alltime_rank: int = sorted(chars.keys(), key = lambda x: chars[x]["dkp_stats"].gear_dkp_alltime_ratio)
-        spell_attend_60d_rank: int = sorted(chars.keys(), key = lambda x: chars[x]["dkp_stats"].spells_attend_60_day_ratio)
+    # Returns a list of Dicts that map character ids to the character's ordinal rank in 3 different categories.
+    def calculate_dkp_rankings(self, chars: Dict[str, Character]) -> List[Dict[str, int]]:
+        gear_attend_60d_rank: int = sorted(chars.keys(), key = lambda x: chars[x].dkp_stats.gear_attend_60_day_ratio)
+        gear_dkp_alltime_rank: int = sorted(chars.keys(), key = lambda x: chars[x].dkp_stats.gear_dkp_alltime_ratio)
+        spell_attend_60d_rank: int = sorted(chars.keys(), key = lambda x: chars[x].dkp_stats.spells_attend_60_day_ratio)
         gear_attend_60d_map: Dict[str, int] = {key: rank for rank, key in enumerate(gear_attend_60d_rank)}
         gear_dkp_alltime_map: Dict[str, int] = {key: rank for rank, key in enumerate(gear_dkp_alltime_rank)}
         spell_attend_60d_map: Dict[str, int] = {key: rank for rank, key in enumerate(spell_attend_60d_rank)}
         return gear_attend_60d_map, gear_dkp_alltime_map, spell_attend_60d_map
     
-    def save_summary_report(self, chars):
+    def save_summary_report(self,  chars: Dict[str, Character]):
         gear_attend_60d_map, gear_dkp_alltime_map, spell_attend_60d_map = self.calculate_dkp_rankings(chars)
         print("Generating a new summary.csv") 
         with open("summary.csv", "w") as summary_file:
@@ -326,15 +328,15 @@ class Scraper:
             for charid, char in chars.items():
                 summary_file.write(
                         "{},{},{},{},{},{},{},{},{}\n".format(
-                            char["name"],
-                            char["dkp_earned"],
-                            char["dkp_stats"].attend_60_day_bracket,
+                            char.name,
+                            char.dkp_earned,
+                            char.dkp_stats.attend_60_day_bracket,
                             gear_attend_60d_map[charid],
                             gear_dkp_alltime_map[charid],
                             spell_attend_60d_map[charid],
-                            char["dkp_stats"].latest_gear_bracket,
-                            char["dkp_stats"].gearcount_60_day,
-                            char["dkp_stats"].gearcount))
+                            char.dkp_stats.latest_gear_bracket,
+                            char.dkp_stats.gearcount_60_day,
+                            char.dkp_stats.gearcount))
 
 if __name__ == "__main__":
     config = Config("config.txt", "alternates.txt",
